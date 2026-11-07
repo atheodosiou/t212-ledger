@@ -1,0 +1,340 @@
+@let acc = account.hasValue() ? account.value() : null;
+@let cur = acc?.accountCurrency ?? 'EUR';
+
+<a routerLink="/" class="text-sm text-muted hover:text-ink">‹ Λογαριασμοί</a>
+
+@if (account.error()) {
+  <p class="mt-6 rounded-xl border border-loss/30 bg-loss/5 p-4 text-sm text-loss">Ο λογαριασμός δεν βρέθηκε.</p>
+} @else if (acc) {
+  <!-- Header -->
+  <div class="mt-3 flex flex-wrap items-start justify-between gap-4">
+    <div>
+      <div class="flex items-center gap-2">
+        <h1 class="text-2xl font-semibold tracking-tight">{{ acc.label }}</h1>
+        <span
+          class="rounded-full px-2 py-0.5 text-xs font-medium"
+          [class]="acc.environment === 'DEMO' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'"
+        >
+          {{ acc.environment === 'DEMO' ? 'Practice' : 'Πραγματικά χρήματα' }}
+        </span>
+      </div>
+      <p class="mt-1 flex items-center gap-1.5 text-sm text-muted" aria-live="polite">
+        @if (syncing()) {
+          <span class="size-2 animate-pulse rounded-full bg-brand"></span>
+          {{ syncLabel[acc.syncStatus] }}
+          @if (acc.syncProgress; as p) {
+            · {{ p.orders }} συναλλαγές, {{ p.transactions }} κινήσεις μετρητών, {{ p.dividends }} μερίσματα
+          }
+          @if (acc.syncProgress?.waitingUntil) {
+            · περιμένουμε το όριο κλήσεων του Trading 212
+          }
+        } @else if (acc.syncStatus === 'FAILED') {
+          <span class="text-loss">Ο συγχρονισμός απέτυχε: {{ acc.syncError }}</span>
+        } @else if (acc.lastSyncedAt) {
+          Ενημερώθηκε {{ dateTime(acc.lastSyncedAt) }}
+        }
+      </p>
+    </div>
+    <button
+      type="button"
+      (click)="syncNow()"
+      [disabled]="syncing() || syncRequested()"
+      class="rounded-lg border border-line bg-surface px-3 py-2 text-sm font-medium transition hover:border-brand/40 disabled:opacity-50"
+    >
+      ↻ Συγχρονισμός
+    </button>
+  </div>
+  @if (actionError()) {
+    <p role="alert" class="mt-3 rounded-lg bg-loss/5 p-3 text-sm text-loss">{{ actionError() }}</p>
+  }
+
+  @if (report.isLoading() && !report.hasValue()) {
+    <div class="mt-8 grid gap-3 sm:grid-cols-4">
+      @for (i of [1, 2, 3, 4]; track i) {
+        <div class="h-24 animate-pulse rounded-xl bg-line/60"></div>
+      }
+    </div>
+  } @else if (report.hasValue() && years().length === 0) {
+    <div class="mt-8 rounded-xl border border-dashed border-line bg-surface p-8 text-center text-sm text-muted">
+      @if (syncing()) {
+        Φέρνουμε το ιστορικό σου από το Trading 212…
+      } @else {
+        Δεν βρέθηκαν κινήσεις σε αυτόν τον λογαριασμό.
+      }
+    </div>
+  } @else if (summary(); as s) {
+    <!-- Controls -->
+    <div class="mt-8 flex flex-wrap items-end justify-between gap-4">
+      <div class="flex flex-wrap items-end gap-4">
+        <label class="text-sm">
+          <span class="block font-medium">Περίοδος</span>
+          <select
+            [value]="year() === null ? 'all' : year()"
+            (change)="selectYear($any($event.target).value)"
+            class="mt-1 rounded-lg border border-line bg-surface px-3 py-2 text-sm"
+          >
+            @for (y of years(); track y) {
+              <option [value]="y">Φορολογικό έτος {{ y }}</option>
+            }
+            <option value="all">Όλο το ιστορικό</option>
+          </select>
+        </label>
+        <fieldset class="text-sm">
+          <legend class="font-medium">Μέθοδος κόστους</legend>
+          <div class="mt-1 inline-flex rounded-lg border border-line bg-surface p-0.5">
+            @for (m of ['AVERAGE', 'FIFO']; track m) {
+              <button
+                type="button"
+                (click)="method.set($any(m))"
+                [attr.aria-pressed]="method() === m"
+                class="rounded-md px-3 py-1.5 text-sm transition"
+                [class]="method() === m ? 'bg-brand text-white' : 'text-muted hover:text-ink'"
+              >
+                {{ m === 'AVERAGE' ? 'Μέση τιμή' : 'FIFO' }}
+              </button>
+            }
+          </div>
+        </fieldset>
+      </div>
+      <div class="flex gap-2">
+        <a
+          [href]="exportHref('xlsx')"
+          download
+          class="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white transition hover:bg-brand-strong"
+        >
+          ↓ Excel για λογιστή
+        </a>
+        <a
+          [href]="exportHref('pdf')"
+          download
+          class="rounded-lg border border-brand px-4 py-2 text-sm font-medium text-brand transition hover:bg-brand/5"
+        >
+          ↓ PDF
+        </a>
+      </div>
+    </div>
+
+    <!-- Result -->
+    <div class="mt-6 grid gap-3 lg:grid-cols-[1.2fr_2fr]">
+      <div class="rounded-xl border border-line bg-surface p-5">
+        <p class="text-sm text-muted">Αποτέλεσμα πωλήσεων</p>
+        <p
+          class="mt-1 text-3xl font-semibold tracking-tight"
+          [class.text-gain]="Number(s.realisedPnl) > 0"
+          [class.text-loss]="Number(s.realisedPnl) < 0"
+        >
+          {{ money(s.realisedPnl, cur) }}
+        </p>
+        <p class="mt-1 text-xs text-muted">{{ sales().length }} πωλήσεις · χρεώσεις συνυπολογισμένες</p>
+        @if (brokerComparison(); as c) {
+          @if (Number(c.difference) !== 0) {
+            <div class="mt-4 rounded-lg bg-amber-50 p-3 text-xs leading-relaxed text-amber-900">
+              Το Trading 212 δείχνει <strong>{{ money(c.broker, cur) }}</strong>. Η διαφορά των
+              <strong>{{ money(c.difference, cur) }}</strong> είναι χρεώσεις (κυρίως μετατροπής νομίσματος) που το Trading 212
+              δεν αφαιρεί από το αποτέλεσμα.
+            </div>
+          }
+        }
+      </div>
+      <dl class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        @for (t of summaryTiles; track t.field) {
+          <div class="rounded-xl border border-line bg-surface p-4">
+            <dt class="text-xs text-muted">
+              {{ t.label }}
+              @if (t.hint) {
+                <span class="block text-[11px] opacity-80">{{ t.hint }}</span>
+              }
+            </dt>
+            <dd class="mt-1 font-semibold">{{ money(s[t.field], cur) }}</dd>
+          </div>
+        }
+      </dl>
+    </div>
+
+    @if (warnings().length) {
+      <div class="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+        <p class="font-medium">{{ warnings().length }} εγγραφές χρειάζονται έλεγχο</p>
+        <ul class="mt-1 list-disc pl-5 text-xs">
+          @for (w of warnings(); track w.entryId) {
+            <li>{{ date(w.date) }} · {{ w.message }}</li>
+          }
+        </ul>
+      </div>
+    }
+
+    <!-- Tables -->
+    <div class="mt-8">
+      <div role="tablist" class="flex gap-1 border-b border-line">
+        @for (t of [
+          { id: 'sales', label: 'Πωλήσεις' },
+          { id: 'entries', label: 'Όλες οι κινήσεις' },
+          { id: 'holdings', label: 'Θέσεις' }
+        ]; track t.id) {
+          <button
+            type="button"
+            role="tab"
+            [attr.aria-selected]="tab() === t.id"
+            (click)="tab.set($any(t.id))"
+            class="-mb-px border-b-2 px-4 py-2 text-sm font-medium transition"
+            [class]="tab() === t.id ? 'border-brand text-ink' : 'border-transparent text-muted hover:text-ink'"
+          >
+            {{ t.label }}
+          </button>
+        }
+      </div>
+
+      <div class="overflow-x-auto rounded-b-xl border border-t-0 border-line bg-surface">
+        @switch (tab()) {
+          @case ('sales') {
+            <table class="w-full min-w-[760px] text-sm">
+              <thead class="bg-canvas text-left text-xs text-muted">
+                <tr>
+                  <th class="px-4 py-2 font-medium">Ημερομηνία</th>
+                  <th class="px-4 py-2 font-medium">Τίτλος</th>
+                  <th class="whitespace-nowrap px-4 py-2 text-right font-medium">Ποσότητα</th>
+                  <th class="whitespace-nowrap px-4 py-2 text-right font-medium">Έσοδο</th>
+                  <th class="whitespace-nowrap px-4 py-2 text-right font-medium">Κόστος</th>
+                  <th class="whitespace-nowrap px-4 py-2 text-right font-medium">Αποτέλεσμα</th>
+                  <th class="whitespace-nowrap px-4 py-2 text-right font-medium">Κατά T212</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-line">
+                @for (s of sales(); track s.entryId) {
+                  <tr class="hover:bg-canvas/60">
+                    <td class="whitespace-nowrap px-4 py-2 text-muted">{{ date(s.date) }}</td>
+                    <td class="px-4 py-2">
+                      <span class="font-medium">{{ ticker(s.ticker) }}</span>
+                      <span class="ml-1 text-muted">{{ s.instrumentName }}</span>
+                    </td>
+                    <td class="px-4 py-2 text-right">{{ qty(s.quantity) }}</td>
+                    <td class="whitespace-nowrap px-4 py-2 text-right">{{ money(s.proceeds, cur) }}</td>
+                    <td class="whitespace-nowrap px-4 py-2 text-right">{{ money(s.costBasis, cur) }}</td>
+                    <td
+                      class="whitespace-nowrap px-4 py-2 text-right font-medium"
+                      [class.text-gain]="Number(s.realisedPnl) > 0"
+                      [class.text-loss]="Number(s.realisedPnl) < 0"
+                    >
+                      {{ money(s.realisedPnl, cur) }}
+                    </td>
+                    <td class="px-4 py-2 text-right text-muted">{{ money(s.brokerRealisedPnl, cur) }}</td>
+                  </tr>
+                } @empty {
+                  <tr>
+                    <td colspan="7" class="px-4 py-8 text-center text-muted">Καμία πώληση σε αυτή την περίοδο.</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          }
+
+          @case ('entries') {
+            <div class="flex flex-wrap gap-3 border-b border-line p-3">
+              <select
+                [value]="kindFilter()"
+                (change)="kindFilter.set($any($event.target).value)"
+                aria-label="Είδος κίνησης"
+                class="rounded-lg border border-line bg-surface px-3 py-1.5 text-sm"
+              >
+                <option value="">Όλα τα είδη</option>
+                @for (k of kinds; track k[0]) {
+                  <option [value]="k[0]">{{ k[1] }}</option>
+                }
+              </select>
+              <input
+                type="search"
+                [value]="search()"
+                (input)="search.set($any($event.target).value)"
+                placeholder="Αναζήτηση τίτλου ή ISIN"
+                aria-label="Αναζήτηση τίτλου ή ISIN"
+                class="min-w-56 flex-1 rounded-lg border border-line px-3 py-1.5 text-sm"
+              />
+            </div>
+            @if (entries.isLoading() && !entries.hasValue()) {
+              <p class="p-6 text-center text-sm text-muted">Φόρτωση…</p>
+            } @else {
+              <table class="w-full min-w-[760px] text-sm">
+                <thead class="bg-canvas text-left text-xs text-muted">
+                  <tr>
+                    <th class="px-4 py-2 font-medium">Ημερομηνία</th>
+                    <th class="px-4 py-2 font-medium">Είδος</th>
+                    <th class="px-4 py-2 font-medium">Τίτλος</th>
+                    <th class="whitespace-nowrap px-4 py-2 text-right font-medium">Ποσότητα</th>
+                    <th class="whitespace-nowrap px-4 py-2 text-right font-medium">Τιμή</th>
+                    <th class="whitespace-nowrap px-4 py-2 text-right font-medium">Χρεώσεις</th>
+                    <th class="whitespace-nowrap px-4 py-2 text-right font-medium">Μετρητά</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-line">
+                  @for (e of visibleEntries(); track e.id) {
+                    <tr class="hover:bg-canvas/60">
+                      <td class="whitespace-nowrap px-4 py-2 text-muted">{{ dateTime(e.occurredAt) }}</td>
+                      <td class="whitespace-nowrap px-4 py-2">{{ kindLabel[e.kind] }}</td>
+                      <td class="px-4 py-2">
+                        @if (e.ticker) {
+                          <span class="font-medium">{{ ticker(e.ticker) }}</span>
+                          <span class="ml-1 text-muted">{{ e.instrumentName }}</span>
+                        }
+                      </td>
+                      <td class="px-4 py-2 text-right">{{ qty(e.quantity) }}</td>
+                      <td class="whitespace-nowrap px-4 py-2 text-right text-muted">
+                        @if (e.price) {
+                          {{ qty(e.price) }} {{ e.instrumentCurrency }}
+                        }
+                      </td>
+                      <td class="px-4 py-2 text-right text-muted">
+                        {{ Number(e.fees) ? money(e.fees, cur) : '' }}
+                      </td>
+                      <td
+                        class="whitespace-nowrap px-4 py-2 text-right font-medium"
+                        [class.text-gain]="Number(e.cashAmount) > 0"
+                        [class.text-loss]="Number(e.cashAmount) < 0"
+                      >
+                        {{ money(e.cashAmount, cur) }}
+                      </td>
+                    </tr>
+                  } @empty {
+                    <tr>
+                      <td colspan="7" class="px-4 py-8 text-center text-muted">Καμία κίνηση με αυτά τα φίλτρα.</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            }
+          }
+
+          @case ('holdings') {
+            <table class="w-full min-w-[640px] text-sm">
+              <thead class="bg-canvas text-left text-xs text-muted">
+                <tr>
+                  <th class="px-4 py-2 font-medium">Τίτλος</th>
+                  <th class="px-4 py-2 font-medium">ISIN</th>
+                  <th class="whitespace-nowrap px-4 py-2 text-right font-medium">Ποσότητα</th>
+                  <th class="whitespace-nowrap px-4 py-2 text-right font-medium">Μέση τιμή</th>
+                  <th class="whitespace-nowrap px-4 py-2 text-right font-medium">Κόστος κτήσης</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-line">
+                @for (h of holdings(); track h.ticker) {
+                  <tr class="hover:bg-canvas/60">
+                    <td class="px-4 py-2">
+                      <span class="font-medium">{{ ticker(h.ticker) }}</span>
+                      <span class="ml-1 text-muted">{{ h.instrumentName }}</span>
+                    </td>
+                    <td class="px-4 py-2 font-mono text-xs text-muted">{{ h.isin }}</td>
+                    <td class="px-4 py-2 text-right">{{ qty(h.quantity) }}</td>
+                    <td class="whitespace-nowrap px-4 py-2 text-right">{{ money(h.averageCost, cur) }}</td>
+                    <td class="whitespace-nowrap px-4 py-2 text-right font-medium">{{ money(h.costBasis, cur) }}</td>
+                  </tr>
+                } @empty {
+                  <tr>
+                    <td colspan="5" class="px-4 py-8 text-center text-muted">Καμία ανοιχτή θέση.</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          }
+        }
+      </div>
+    </div>
+  }
+}

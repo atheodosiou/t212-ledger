@@ -1,0 +1,136 @@
+<div class="grid gap-8 lg:grid-cols-[1fr_380px]">
+  <section>
+    <h1 class="text-2xl font-semibold tracking-tight">Οι λογαριασμοί σου</h1>
+    <p class="mt-1 text-sm text-muted">
+      Όλο το ιστορικό συναλλαγών από την πρώτη μέρα, με αναφορές έτοιμες για τον λογιστή.
+    </p>
+
+    <div class="mt-6">
+      @if (accounts.isLoading() && !accounts.hasValue()) {
+        <div class="h-24 animate-pulse rounded-xl bg-line/60"></div>
+      } @else if (accounts.error()) {
+        <p class="rounded-xl border border-loss/30 bg-loss/5 p-4 text-sm text-loss">
+          Δεν φορτώθηκαν οι λογαριασμοί. Τρέχει το API στο localhost:3000;
+        </p>
+      } @else if (accounts.hasValue()) {
+        @for (account of accounts.value(); track account.id) {
+          <a
+            [routerLink]="['/accounts', account.id]"
+            class="mb-3 flex items-center justify-between gap-4 rounded-xl border border-line bg-surface p-4 transition hover:border-brand/40 hover:shadow-sm focus-visible:outline-2 focus-visible:outline-brand"
+          >
+            <div class="min-w-0">
+              <div class="flex items-center gap-2">
+                <span class="truncate font-medium">{{ account.label }}</span>
+                <span
+                  class="rounded-full px-2 py-0.5 text-xs font-medium"
+                  [class]="account.environment === 'DEMO' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'"
+                >
+                  {{ account.environment === 'DEMO' ? 'Practice' : 'Πραγματικά χρήματα' }}
+                </span>
+              </div>
+              <p class="mt-1 text-xs text-muted">
+                @if (account.lastSyncedAt) {
+                  Τελευταίος συγχρονισμός {{ dateTime(account.lastSyncedAt) }}
+                } @else {
+                  Δεν έχει συγχρονιστεί ακόμα
+                }
+              </p>
+            </div>
+            <span
+              class="flex shrink-0 items-center gap-1.5 text-xs"
+              [class.text-loss]="account.syncStatus === 'FAILED'"
+              [class.text-muted]="account.syncStatus !== 'FAILED'"
+            >
+              @if (isSyncing(account.syncStatus)) {
+                <span class="size-2 animate-pulse rounded-full bg-brand"></span>
+              }
+              {{ syncLabel[account.syncStatus] }}
+              <span aria-hidden="true" class="ml-2 text-base text-muted">›</span>
+            </span>
+          </a>
+        } @empty {
+          <div class="rounded-xl border border-dashed border-line bg-surface p-8 text-center">
+            <p class="font-medium">Δεν έχεις συνδέσει λογαριασμό ακόμα</p>
+            <p class="mt-1 text-sm text-muted">Σύνδεσε τον Trading 212 λογαριασμό σου από τη φόρμα.</p>
+          </div>
+        }
+      }
+    </div>
+  </section>
+
+  <section class="h-fit rounded-xl border border-line bg-surface p-5">
+    <h2 class="font-semibold">Σύνδεση λογαριασμού Trading 212</h2>
+    <ol class="mt-2 list-decimal space-y-1 pl-4 text-xs text-muted">
+      <li>Στο Trading 212: <span class="text-ink">Settings → API (Beta) → Generate API key</span>.</li>
+      <li>Δώσε <span class="font-medium text-ink">μόνο δικαιώματα ανάγνωσης</span> (account data, history, portfolio). Όχι orders.</li>
+      <li>Αντέγραψε key και secret εδώ. Αποθηκεύονται κρυπτογραφημένα.</li>
+    </ol>
+
+    <form [formRoot]="connectForm" class="mt-5 space-y-4">
+      <label class="block">
+        <span class="text-sm font-medium">Όνομα</span>
+        <input
+          [formField]="connectForm.label"
+          placeholder="π.χ. Practice"
+          class="mt-1 block w-full rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
+        />
+        @if (connectForm.label().touched() && connectForm.label().invalid()) {
+          <span class="mt-1 block text-xs text-loss">{{ connectForm.label().errors()[0].message }}</span>
+        }
+      </label>
+
+      <label class="block">
+        <span class="text-sm font-medium">Λογαριασμός</span>
+        <select
+          [formField]="connectForm.environment"
+          class="mt-1 block w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
+        >
+          <option value="DEMO">Practice (εικονικά χρήματα)</option>
+          <option value="LIVE">Πραγματικά χρήματα</option>
+        </select>
+      </label>
+
+      <label class="block">
+        <span class="text-sm font-medium">API key</span>
+        <input
+          [formField]="connectForm.apiKey"
+          autocomplete="off"
+          spellcheck="false"
+          class="mt-1 block w-full rounded-lg border border-line px-3 py-2 font-mono text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
+        />
+        @if (connectForm.apiKey().touched() && connectForm.apiKey().invalid()) {
+          <span class="mt-1 block text-xs text-loss">{{ connectForm.apiKey().errors()[0].message }}</span>
+        }
+      </label>
+
+      <label class="block">
+        <span class="text-sm font-medium">API secret</span>
+        <input
+          [formField]="connectForm.apiSecret"
+          type="password"
+          autocomplete="off"
+          class="mt-1 block w-full rounded-lg border border-line px-3 py-2 font-mono text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
+        />
+        @if (connectForm.apiSecret().touched() && connectForm.apiSecret().invalid()) {
+          <span class="mt-1 block text-xs text-loss">{{ connectForm.apiSecret().errors()[0].message }}</span>
+        }
+      </label>
+
+      @if (serverError()) {
+        <p role="alert" class="rounded-lg bg-loss/5 p-3 text-sm text-loss">{{ serverError() }}</p>
+      }
+
+      <button
+        type="submit"
+        [disabled]="connectForm().submitting()"
+        class="w-full rounded-lg bg-brand px-4 py-2.5 text-sm font-medium text-white transition hover:bg-brand-strong disabled:opacity-60"
+      >
+        @if (connectForm().submitting()) {
+          Έλεγχος key…
+        } @else {
+          Σύνδεση και συγχρονισμός
+        }
+      </button>
+    </form>
+  </section>
+</div>

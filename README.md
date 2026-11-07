@@ -3,7 +3,7 @@
 Full investment history for Trading 212 accounts, with accountant-ready exports (PDF + Excel) and a buy/sell timeline.
 
 - `apps/api` - NestJS 12, PostgreSQL (Drizzle), background sync with pg-boss
-- `apps/web` - Angular 22
+- `apps/web` - Angular 22, Tailwind CSS 4 (added with `ng add tailwindcss`), Signal Forms, `httpResource`
 - `libs/shared` - types shared by both
 
 ## How it works
@@ -22,7 +22,8 @@ npm run db:up                      # Postgres 18 on localhost:5433
 cp apps/api/.env.example apps/api/.env   # then fill CREDENTIAL_ENCRYPTION_KEY
 npm run build -w api && npm run db:migrate
 npm run dev:api                    # http://localhost:3000/api
-npm run dev:web                    # http://localhost:4200
+npm run build:shared
+npm run dev:web                    # http://localhost:4200, proxies /api to :3000
 ```
 
 ## API
@@ -40,6 +41,7 @@ npm run dev:web                    # http://localhost:4200
 ## Status
 
 - Sign-in is a temporary single-user stub (`DEV_USER_EMAIL`). Real sign-in is required before any public deployment.
-- Not built yet: timeline, web UI.
+- Web UI: accounts list + connect form, account page (sync status, tax year, cost method, Trading 212 comparison, Excel/PDF download, sales / movements / holdings).
+- Not built yet: buy/sell timeline.
 - Verified on a practice account (2026-11-07): `walletImpact.netValue` includes FX fees (BUY: cost + fee, SELL: proceeds - fee). Our realised P&L includes fees; Trading 212's own `realisedProfitLoss` and position cost exclude them, so they differ by exactly the fees.
 - Still to verify with real data: dividend withholding, corporate actions (no such events in the practice account).
