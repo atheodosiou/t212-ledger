@@ -35,6 +35,7 @@ npm run dev:web                    # http://localhost:4200, proxies /api to :300
 | POST | `/api/accounts/:id/sync` | `{ full?: boolean }` |
 | GET | `/api/accounts/:id/ledger` | `?year=&ticker=&kind=` |
 | GET | `/api/accounts/:id/report` | `?method=AVERAGE\|FIFO`: sales, holdings, yearly totals, warnings |
+| GET | `/api/accounts/:id/timeline` | `?method=`: monthly totals and, per instrument, every trade with the position and average cost after it |
 | GET | `/api/accounts/:id/export` | `?format=xlsx\|pdf&method=AVERAGE\|FIFO&year=`: accountant report (Greek labels; tax years in Europe/Athens time) |
 | DELETE | `/api/accounts/:id` | removes the account and all its data |
 
@@ -42,6 +43,6 @@ npm run dev:web                    # http://localhost:4200, proxies /api to :300
 
 - Sign-in is a temporary single-user stub (`DEV_USER_EMAIL`). Real sign-in is required before any public deployment.
 - Web UI: accounts list + connect form, account page (sync status, tax year, cost method, Trading 212 comparison, Excel/PDF download, sales / movements / holdings).
-- Not built yet: buy/sell timeline.
+- Timeline page: monthly buys/sells chart (with table view) and a per-instrument chart of buys, sells and the average-cost step line (hand-written SVG, no chart library).
 - Verified on a practice account (2026-11-07): `walletImpact.netValue` includes FX fees (BUY: cost + fee, SELL: proceeds - fee). Our realised P&L includes fees; Trading 212's own `realisedProfitLoss` and position cost exclude them, so they differ by exactly the fees.
 - Still to verify with real data: dividend withholding, corporate actions (no such events in the practice account).

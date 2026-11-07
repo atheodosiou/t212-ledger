@@ -1,5 +1,14 @@
 import { httpResource } from '@angular/common/http';
-import { ChangeDetectionStrategy, Component, computed, effect, inject, input, linkedSignal, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  effect,
+  inject,
+  input,
+  linkedSignal,
+  signal,
+} from '@angular/core';
 import { RouterLink } from '@angular/router';
 import type { AccountDto, CostMethod, LedgerEntryDto, LedgerKind, ReportDto } from '@t212/shared';
 import { Api, exportUrl } from '../../core/api';
@@ -44,10 +53,14 @@ export class AccountPage {
   readonly id = input.required<string>();
 
   protected readonly account = httpResource<AccountDto>(() => `/api/accounts/${this.id()}`);
-  protected readonly status = computed(() => (this.account.hasValue() ? this.account.value().syncStatus : undefined));
+  protected readonly status = computed(() =>
+    this.account.hasValue() ? this.account.value().syncStatus : undefined,
+  );
   protected readonly syncing = computed(() => isSyncing(this.status()));
   /** Changes only when a sync finishes, so the report is refetched exactly then. */
-  private readonly syncedAt = computed(() => (this.account.hasValue() ? this.account.value().lastSyncedAt : null));
+  private readonly syncedAt = computed(() =>
+    this.account.hasValue() ? this.account.value().lastSyncedAt : null,
+  );
 
   protected readonly method = signal<CostMethod>('AVERAGE');
   protected readonly report = httpResource<ReportDto>(() => {
@@ -56,23 +69,29 @@ export class AccountPage {
   });
 
   protected readonly years = computed(() =>
-    this.report.hasValue() ? this.report.value().years.map((y) => y.year).reverse() : [],
+    this.report.hasValue()
+      ? this.report
+          .value()
+          .years.map((y) => y.year)
+          .reverse()
+      : [],
   );
   /** null = whole history. Defaults to the latest year once the report arrives. */
   protected readonly year = linkedSignal<number[], number | null>({
     source: this.years,
     computation: (years, previous) =>
-      previous && (previous.value === null || years.includes(previous.value)) ? previous.value : (years[0] ?? null),
+      previous && (previous.value === null || years.includes(previous.value))
+        ? previous.value
+        : (years[0] ?? null),
   });
 
   protected readonly summary = computed(() => {
     if (!this.report.hasValue()) return null;
     const year = this.year();
     const years = this.report.value().years.filter((y) => year === null || y.year === year);
-    return Object.fromEntries(SUMMARY_FIELDS.map((f) => [f, sumMoney(years.map((y) => y[f]))])) as Record<
-      SummaryField,
-      string
-    >;
+    return Object.fromEntries(
+      SUMMARY_FIELDS.map((f) => [f, sumMoney(years.map((y) => y[f]))]),
+    ) as Record<SummaryField, string>;
   });
 
   protected readonly sales = computed(() => {

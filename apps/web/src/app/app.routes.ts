@@ -11,5 +11,10 @@ export const routes: Routes = [
     title: 'Λογαριασμός · t212 ledger',
     loadComponent: () => import('./pages/account/account.page').then((m) => m.AccountPage),
   },
+  {
+    path: 'accounts/:id/timeline',
+    title: 'Χρονολόγιο · t212 ledger',
+    loadComponent: () => import('./pages/timeline/timeline.page').then((m) => m.TimelinePage),
+  },
   { path: '**', redirectTo: '' },
 ];

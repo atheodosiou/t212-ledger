@@ -100,6 +100,51 @@ export interface YearSummaryDto {
   holdingsAtYearEnd: HoldingDto[];
 }
 
+export interface PositionEventDto {
+  entryId: string;
+  date: string;
+  kind: 'BUY' | 'SELL' | 'CORPORATE_ACTION';
+  sourceType: string;
+  ticker: string;
+  isin: string | null;
+  instrumentName: string | null;
+  quantity: string;
+  pricePerShare: string | null;
+  positionQuantity: string;
+  averageCost: string | null;
+  realisedPnl: string | null;
+}
+
+export interface MonthBucketDto {
+  month: string;
+  deposits: string;
+  withdrawals: string;
+  purchases: string;
+  saleProceeds: string;
+  realisedPnl: string;
+  dividends: string;
+  interest: string;
+  fees: string;
+  buys: number;
+  sells: number;
+  cumulativeNetDeposits: string;
+}
+
+export interface InstrumentTimelineDto {
+  ticker: string;
+  isin: string | null;
+  instrumentName: string | null;
+  trades: number;
+  currentQuantity: string;
+  events: PositionEventDto[];
+}
+
+export interface TimelineDto {
+  method: CostMethod;
+  months: MonthBucketDto[];
+  instruments: InstrumentTimelineDto[];
+}
+
 export interface ReportDto {
   method: CostMethod;
   sales: RealisedSaleDto[];

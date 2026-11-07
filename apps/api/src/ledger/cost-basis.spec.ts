@@ -157,6 +157,24 @@ describe('computeCostBasis', () => {
     expect(computeCostBasis([late], 'AVERAGE', 'UTC').years.map((y) => y.year)).toEqual([2025]);
   });
 
+  it('records the position after every trade for the timeline', () => {
+    const events = computeCostBasis(ledger, 'AVERAGE').positionEvents;
+    expect(events.map((e) => [e.kind, e.quantity, e.pricePerShare, e.positionQuantity, e.averageCost])).toEqual([
+      ['BUY', '10', '10.0000', '10', '10.0000'],
+      ['BUY', '10', '20.0000', '20', '15.0000'],
+      ['SELL', '-10', '25.0000', '10', '15.0000'],
+    ]);
+    expect(events[2].realisedPnl).toBe('100.00');
+  });
+
+  it('closes the average cost when a position is fully sold', () => {
+    const events = computeCostBasis(
+      [buy('2025-01-01T00:00:00Z', '2', '20'), sell('2025-01-02T00:00:00Z', '2', '30')],
+      'FIFO',
+    ).positionEvents;
+    expect(events[1]).toMatchObject({ positionQuantity: '0', averageCost: null });
+  });
+
   it('ignores internal transfers', () => {
     const result = computeCostBasis(
       [entry({ kind: 'TRANSFER', occurredAt: at('2025-01-01T00:00:00Z'), cashAmount: '-100' })],

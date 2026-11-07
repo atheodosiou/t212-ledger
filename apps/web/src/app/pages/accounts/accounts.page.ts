@@ -26,7 +26,12 @@ export class AccountsPage {
   protected readonly accounts = httpResource<AccountDto[]>(() => '/api/accounts');
   protected readonly serverError = signal<string | null>(null);
 
-  protected readonly model = signal<ConnectModel>({ label: '', environment: 'DEMO', apiKey: '', apiSecret: '' });
+  protected readonly model = signal<ConnectModel>({
+    label: '',
+    environment: 'DEMO',
+    apiKey: '',
+    apiSecret: '',
+  });
   protected readonly connectForm = form(
     this.model,
     (path) => {

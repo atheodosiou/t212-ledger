@@ -69,12 +69,32 @@ export interface EngineWarning {
   message: string;
 }
 
+/** State of one position right after a trade or corporate action, for timelines. */
+export interface PositionEvent {
+  entryId: string;
+  date: Date;
+  kind: 'BUY' | 'SELL' | 'CORPORATE_ACTION';
+  sourceType: string;
+  ticker: string;
+  isin: string | null;
+  instrumentName: string | null;
+  /** Shares bought (+) or sold (-). */
+  quantity: string;
+  /** Account currency per share, fees included; null for corporate actions. */
+  pricePerShare: string | null;
+  positionQuantity: string;
+  /** Account currency per share after the event; null when the position is closed. */
+  averageCost: string | null;
+  realisedPnl: string | null;
+}
+
 export interface EngineResult {
   method: CostMethod;
   sales: RealisedSale[];
   holdings: Holding[];
   years: YearSummary[];
   warnings: EngineWarning[];
+  positionEvents: PositionEvent[];
 }
 
 interface Lot {
@@ -138,6 +158,28 @@ export function computeCostBasis(
   };
   const warn = (entry: EngineEntry, message: string) =>
     warnings.push({ entryId: entry.id, date: entry.occurredAt, message });
+  const positionEvents: PositionEvent[] = [];
+  const record = (entry: EngineEntry, pos: Position, quantity: Decimal, realisedPnl: Decimal | null) => {
+    const held = pos.lots.reduce((s, l) => s.plus(l.quantity), ZERO);
+    const cost = pos.lots.reduce((s, l) => s.plus(l.cost), ZERO);
+    positionEvents.push({
+      entryId: entry.id,
+      date: entry.occurredAt,
+      kind: entry.kind as PositionEvent['kind'],
+      sourceType: entry.sourceType,
+      ticker: pos.ticker,
+      isin: pos.isin,
+      instrumentName: pos.instrumentName,
+      quantity: quantity.toFixed(),
+      pricePerShare:
+        entry.kind === 'CORPORATE_ACTION' || quantity.isZero()
+          ? null
+          : new Decimal(entry.cashAmount).abs().div(quantity.abs()).toFixed(4),
+      positionQuantity: held.lte(EPS) ? '0' : held.toFixed(),
+      averageCost: held.lte(EPS) ? null : cost.div(held).toFixed(4),
+      realisedPnl: realisedPnl ? realisedPnl.toFixed(2) : null,
+    });
+  };
 
   for (const entry of sorted) {
     const year = yearOf(entry.occurredAt);
@@ -182,6 +224,7 @@ export function computeCostBasis(
         }
         add(year, 'purchases', cost);
         add(year, 'fees', fees);
+        record(entry, pos, quantity, null);
         break;
       }
       case 'SELL': {
@@ -212,6 +255,7 @@ export function computeCostBasis(
         add(year, 'saleProceeds', proceeds);
         add(year, 'realisedPnl', pnl);
         add(year, 'fees', fees);
+        record(entry, pos, quantity.neg(), pnl);
         break;
       }
       case 'CORPORATE_ACTION': {
@@ -229,6 +273,7 @@ export function computeCostBasis(
           consume(pos, delta.abs());
           warn(entry, `${pos.ticker}: ${entry.sourceType} removed ${delta.abs().toFixed()} shares; review`);
         }
+        record(entry, pos, delta, null);
         break;
       }
       case 'TRANSFER':
@@ -247,6 +292,7 @@ export function computeCostBasis(
       .sort(([a], [b]) => a - b)
       .map(([year, t]) => ({ year, ...t, holdingsAtYearEnd: yearEndHoldings.get(year) ?? [] })),
     warnings,
+    positionEvents,
   };
 }
 

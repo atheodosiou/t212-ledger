@@ -83,6 +83,16 @@ export class AccountsController {
     return this.ledger.list(id, query);
   }
 
+  @Get(':id/timeline')
+  async timeline(
+    @CurrentUser() user: CurrentUserData,
+    @Param('id', { schema: accountIdSchema }) id: string,
+    @Query({ schema: reportQuerySchema }) query: z.infer<typeof reportQuerySchema>,
+  ) {
+    await this.accounts.get(user.id, id);
+    return this.ledger.timeline(id, query.method);
+  }
+
   @Get(':id/export')
   async export(
     @CurrentUser() user: CurrentUserData,

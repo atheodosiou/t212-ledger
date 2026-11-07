@@ -5,6 +5,7 @@ import type { Db } from '../db/db.js';
 import { ledgerEntries, rawEvents, type LedgerEntry, type NewLedgerEntry } from '../db/schema.js';
 import { computeCostBasis, DEFAULT_TAX_TIME_ZONE, type CostMethod, type EngineResult } from './cost-basis.js';
 import { normalizeRaw, type LedgerKind } from './normalize.js';
+import { buildTimeline, type Timeline } from './timeline.js';
 
 const INSERT_CHUNK = 500;
 
@@ -51,6 +52,10 @@ export class LedgerService {
       .from(ledgerEntries)
       .where(and(...conditions))
       .orderBy(asc(ledgerEntries.occurredAt));
+  }
+
+  async timeline(accountId: string, method: CostMethod): Promise<Timeline> {
+    return buildTimeline(await this.list(accountId), method);
   }
 
   /** Replays the full ledger (cost basis needs the whole history, whatever year is reported). */

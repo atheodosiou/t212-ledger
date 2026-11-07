@@ -23,7 +23,11 @@
                 <span class="truncate font-medium">{{ account.label }}</span>
                 <span
                   class="rounded-full px-2 py-0.5 text-xs font-medium"
-                  [class]="account.environment === 'DEMO' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'"
+                  [class]="
+                    account.environment === 'DEMO'
+                      ? 'bg-amber-100 text-amber-800'
+                      : 'bg-emerald-100 text-emerald-800'
+                  "
                 >
                   {{ account.environment === 'DEMO' ? 'Practice' : 'Πραγματικά χρήματα' }}
                 </span>
@@ -51,7 +55,9 @@
         } @empty {
           <div class="rounded-xl border border-dashed border-line bg-surface p-8 text-center">
             <p class="font-medium">Δεν έχεις συνδέσει λογαριασμό ακόμα</p>
-            <p class="mt-1 text-sm text-muted">Σύνδεσε τον Trading 212 λογαριασμό σου από τη φόρμα.</p>
+            <p class="mt-1 text-sm text-muted">
+              Σύνδεσε τον Trading 212 λογαριασμό σου από τη φόρμα.
+            </p>
           </div>
         }
       }
@@ -61,8 +67,13 @@
   <section class="h-fit rounded-xl border border-line bg-surface p-5">
     <h2 class="font-semibold">Σύνδεση λογαριασμού Trading 212</h2>
     <ol class="mt-2 list-decimal space-y-1 pl-4 text-xs text-muted">
-      <li>Στο Trading 212: <span class="text-ink">Settings → API (Beta) → Generate API key</span>.</li>
-      <li>Δώσε <span class="font-medium text-ink">μόνο δικαιώματα ανάγνωσης</span> (account data, history, portfolio). Όχι orders.</li>
+      <li>
+        Στο Trading 212: <span class="text-ink">Settings → API (Beta) → Generate API key</span>.
+      </li>
+      <li>
+        Δώσε <span class="font-medium text-ink">μόνο δικαιώματα ανάγνωσης</span> (account data,
+        history, portfolio). Όχι orders.
+      </li>
       <li>Αντέγραψε key και secret εδώ. Αποθηκεύονται κρυπτογραφημένα.</li>
     </ol>
 
@@ -75,7 +86,9 @@
           class="mt-1 block w-full rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
         />
         @if (connectForm.label().touched() && connectForm.label().invalid()) {
-          <span class="mt-1 block text-xs text-loss">{{ connectForm.label().errors()[0].message }}</span>
+          <span class="mt-1 block text-xs text-loss">{{
+            connectForm.label().errors()[0].message
+          }}</span>
         }
       </label>
 
@@ -99,7 +112,9 @@
           class="mt-1 block w-full rounded-lg border border-line px-3 py-2 font-mono text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
         />
         @if (connectForm.apiKey().touched() && connectForm.apiKey().invalid()) {
-          <span class="mt-1 block text-xs text-loss">{{ connectForm.apiKey().errors()[0].message }}</span>
+          <span class="mt-1 block text-xs text-loss">{{
+            connectForm.apiKey().errors()[0].message
+          }}</span>
         }
       </label>
 
@@ -112,7 +127,9 @@
           class="mt-1 block w-full rounded-lg border border-line px-3 py-2 font-mono text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
         />
         @if (connectForm.apiSecret().touched() && connectForm.apiSecret().invalid()) {
-          <span class="mt-1 block text-xs text-loss">{{ connectForm.apiSecret().errors()[0].message }}</span>
+          <span class="mt-1 block text-xs text-loss">{{
+            connectForm.apiSecret().errors()[0].message
+          }}</span>
         }
       </label>
 
