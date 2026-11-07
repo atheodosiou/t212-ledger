@@ -1,0 +1,16 @@
+{
+  "name": "t212-ledger",
+  "private": true,
+  "workspaces": ["libs/*", "apps/*"],
+  "scripts": {
+    "build:shared": "npm run build -w @t212/shared",
+    "dev:api": "npm run start:dev -w api",
+    "dev:web": "npm run start -w web",
+    "db:up": "docker compose up -d db",
+    "db:generate": "npm run db:generate -w api",
+    "db:migrate": "npm run db:migrate -w api",
+    "test": "npm run test -w api && npm run test -w web -- --watch=false",
+    "lint": "npm run lint -w api",
+    "typecheck": "npm run build:shared && npm run typecheck -w api && npm run typecheck -w web"
+  }
+}
