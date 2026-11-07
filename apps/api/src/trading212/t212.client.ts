@@ -7,6 +7,7 @@ import {
   type T212Dividend,
   type T212Environment,
   type T212OrderItem,
+  type T212Position,
   type T212Page,
 } from './t212.types.js';
 
@@ -48,6 +49,11 @@ export class T212Client {
 
   accountSummary(): Promise<T212AccountSummary> {
     return this.get('/api/v0/equity/account/summary');
+  }
+
+  /** Open positions with live prices. */
+  positions(): Promise<T212Position[]> {
+    return this.get('/api/v0/equity/positions');
   }
 
   /** Every tradable instrument (~17k). Limited to one call per 50 seconds. */

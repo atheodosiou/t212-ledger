@@ -94,3 +94,14 @@ export function apiErrorMessage(
   if (Array.isArray(message)) return message.join(' · ');
   return message || fallback;
 }
+
+const timeFormat = new Intl.DateTimeFormat('el-GR', {
+  timeZone: TIME_ZONE,
+  hour: '2-digit',
+  minute: '2-digit',
+  hour12: false,
+});
+
+export function timeOfDay(value: string | Date): string {
+  return timeFormat.format(new Date(value));
+}

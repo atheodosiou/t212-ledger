@@ -14,6 +14,7 @@ import { Api, exportUrl } from '../../core/api';
 import { whileActive } from '../../core/poll';
 import { AccountSkeleton } from '../../ui/account-skeleton';
 import { SyncProgress } from '../../ui/sync-progress';
+import { PortfolioNow } from './portfolio-now';
 import {
   apiErrorMessage,
   date,
@@ -44,7 +45,7 @@ type SummaryField = (typeof SUMMARY_FIELDS)[number];
 
 @Component({
   selector: 'app-account-page',
-  imports: [RouterLink, SyncProgress, AccountSkeleton],
+  imports: [RouterLink, SyncProgress, AccountSkeleton, PortfolioNow],
   templateUrl: './account.page.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
@@ -208,12 +209,20 @@ export class AccountPage {
   protected readonly summaryTiles: { field: SummaryField; label: string; hint?: string }[] = [
     { field: 'deposits', label: 'Καταθέσεις' },
     { field: 'withdrawals', label: 'Αναλήψεις' },
-    { field: 'purchases', label: 'Αγορές', hint: 'με χρεώσεις' },
-    { field: 'saleProceeds', label: 'Έσοδα πωλήσεων', hint: 'μετά χρεώσεων' },
     { field: 'dividends', label: 'Μερίσματα', hint: 'καθαρά' },
     { field: 'interest', label: 'Τόκοι' },
     { field: 'fees', label: 'Χρεώσεις', hint: 'FX, κατάθεσης κ.ά.' },
   ];
+
+  protected readonly periodLabel = computed(() => {
+    const year = this.year();
+    return year === null ? 'Όλο το ιστορικό' : `Φορολογικό έτος ${year}`;
+  });
+
+  protected readonly holdingsTabLabel = computed(() => {
+    const year = this.year();
+    return year === null || year === this.years()[0] ? 'Θέσεις σε κόστος' : `Θέσεις 31/12/${year}`;
+  });
 
   protected readonly kinds = Object.entries(KIND_LABEL) as [LedgerKind, string][];
   protected readonly kindLabel = KIND_LABEL;

@@ -84,9 +84,36 @@ export interface T212Page<T> {
   nextPagePath: string | null;
 }
 
+/** /equity/account/summary, shape confirmed on a live account (2026-11-08). */
 export interface T212AccountSummary {
-  totalValue?: number;
-  [key: string]: unknown;
+  id?: number;
+  currency?: string;
+  /** Investments plus all cash, account currency. */
+  totalValue: number;
+  cash?: { availableToTrade?: number; reservedForOrders?: number; inPies?: number };
+  investments?: {
+    currentValue?: number;
+    totalCost?: number;
+    realizedProfitLoss?: number;
+    unrealizedProfitLoss?: number;
+  };
+}
+
+/** Item of /equity/positions. walletImpact is in the account currency. */
+export interface T212Position {
+  instrument: T212Instrument;
+  quantity: number;
+  averagePricePaid: number;
+  /** Instrument currency. */
+  currentPrice: number;
+  createdAt?: string;
+  walletImpact: {
+    currency: string;
+    currentValue: number;
+    totalCost: number;
+    unrealizedProfitLoss: number;
+    fxImpact?: number;
+  };
 }
 
 export class T212ApiError extends Error {

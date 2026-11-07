@@ -8,6 +8,7 @@ import { validateEnv, type Env } from './config/env.js';
 import { EncryptionService } from './crypto/encryption.service.js';
 import { InstrumentsService } from './trading212/instruments.service.js';
 import { ExportService } from './export/export.service.js';
+import { PortfolioService } from './portfolio/portfolio.service.js';
 import * as schema from './db/schema.js';
 import { LedgerService } from './ledger/ledger.service.js';
 import { HistorySyncService } from './sync/history-sync.service.js';
@@ -33,6 +34,7 @@ import { DevUserGuard } from './users/current-user.js';
     LedgerService,
     InstrumentsService,
     ExportService,
+    PortfolioService,
     HistorySyncService,
     SyncQueueService,
     DevUserGuard,

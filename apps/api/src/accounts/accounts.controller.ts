@@ -1,6 +1,7 @@
 import { Body, Controller, Delete, Get, HttpCode, Param, Post, Query, StreamableFile, UseGuards } from '@nestjs/common';
 import { z } from 'zod';
 import { ExportService } from '../export/export.service.js';
+import { PortfolioService } from '../portfolio/portfolio.service.js';
 import { LedgerService } from '../ledger/ledger.service.js';
 import { SyncQueueService } from '../sync/sync-queue.service.js';
 import { CurrentUser, DevUserGuard, type CurrentUserData } from '../users/current-user.js';
@@ -36,6 +37,7 @@ export class AccountsController {
     private readonly ledger: LedgerService,
     private readonly queue: SyncQueueService,
     private readonly exports: ExportService,
+    private readonly portfolios: PortfolioService,
   ) {}
 
   @Get()
@@ -81,6 +83,13 @@ export class AccountsController {
   ) {
     await this.accounts.get(user.id, id);
     return this.ledger.list(id, query);
+  }
+
+  /** Live value, total result and its breakdown, open positions. */
+  @Get(':id/portfolio')
+  async portfolio(@CurrentUser() user: CurrentUserData, @Param('id', { schema: accountIdSchema }) id: string) {
+    const account = await this.accounts.get(user.id, id);
+    return this.portfolios.view(account);
   }
 
   @Get(':id/timeline')

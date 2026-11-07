@@ -35,6 +35,7 @@ npm run dev:web                    # http://localhost:4200, proxies /api to :300
 | POST | `/api/accounts/:id/sync` | `{ full?: boolean }` |
 | GET | `/api/accounts/:id/ledger` | `?year=&ticker=&kind=` |
 | GET | `/api/accounts/:id/report` | `?method=AVERAGE\|FIFO`: sales, holdings, yearly totals, warnings |
+| GET | `/api/accounts/:id/portfolio` | live value from Trading 212 (cached 20 s), total result since the first deposit and its breakdown, open positions |
 | GET | `/api/accounts/:id/timeline` | `?method=`: monthly totals and, per instrument, every trade with the position and average cost after it |
 | GET | `/api/accounts/:id/export` | `?format=xlsx\|pdf&method=AVERAGE\|FIFO&year=`: accountant report (Greek labels; tax years in Europe/Athens time) |
 | DELETE | `/api/accounts/:id` | removes the account and all its data |

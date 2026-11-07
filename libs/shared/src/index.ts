@@ -175,3 +175,37 @@ export interface ReportDto {
   warnings: { entryId: string; date: string; message: string }[];
   dividends: DividendDetailDto[];
 }
+
+export interface LivePositionDto {
+  ticker: string;
+  isin: string | null;
+  instrumentName: string | null;
+  quantity: string;
+  currentPrice: string;
+  instrumentCurrency: string | null;
+  value: string;
+  cost: string;
+  result: string;
+  resultPct: string | null;
+  weightPct: string;
+  fxImpact: string | null;
+}
+
+export type BreakdownKey = 'realised' | 'unrealised' | 'dividends' | 'interest' | 'fees' | 'other';
+
+export interface PortfolioDto {
+  asOf: string;
+  currency: string;
+  totalValue: string;
+  investedValue: string;
+  cash: string;
+  netDeposits: string;
+  totalResult: string;
+  totalResultPct: string | null;
+  breakdown: { key: BreakdownKey; amount: string }[];
+  breakdownTotal: string;
+  unexplained: string;
+  positions: LivePositionDto[];
+  /** True when Trading 212 rate-limited us and this is the last good snapshot. */
+  stale: boolean;
+}
