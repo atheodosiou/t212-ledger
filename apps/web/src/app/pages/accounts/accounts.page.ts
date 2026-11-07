@@ -4,6 +4,7 @@ import { form, FormField, FormRoot, maxLength, minLength, required } from '@angu
 import { Router, RouterLink } from '@angular/router';
 import type { AccountDto, BrokerEnvironment } from '@t212/shared';
 import { Api } from '../../core/api';
+import { whileActive } from '../../core/poll';
 import { apiErrorMessage, dateTime, isSyncing, SYNC_LABEL } from '../../core/format';
 
 interface ConnectModel {
@@ -25,6 +26,15 @@ export class AccountsPage {
 
   protected readonly accounts = httpResource<AccountDto[]>(() => '/api/accounts');
   protected readonly serverError = signal<string | null>(null);
+
+  constructor() {
+    // Keep sync statuses current without a page refresh.
+    whileActive(
+      () => this.accounts.hasValue() && this.accounts.value().some((a) => isSyncing(a.syncStatus)),
+      3000,
+      () => this.accounts.reload(),
+    );
+  }
 
   protected readonly model = signal<ConnectModel>({
     label: '',

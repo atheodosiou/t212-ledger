@@ -3,7 +3,6 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
-  effect,
   inject,
   input,
   linkedSignal,
@@ -12,6 +11,9 @@ import {
 import { RouterLink } from '@angular/router';
 import type { AccountDto, CostMethod, LedgerEntryDto, LedgerKind, ReportDto } from '@t212/shared';
 import { Api, exportUrl } from '../../core/api';
+import { whileActive } from '../../core/poll';
+import { AccountSkeleton } from '../../ui/account-skeleton';
+import { SyncProgress } from '../../ui/sync-progress';
 import {
   apiErrorMessage,
   date,
@@ -42,7 +44,7 @@ type SummaryField = (typeof SUMMARY_FIELDS)[number];
 
 @Component({
   selector: 'app-account-page',
-  imports: [RouterLink],
+  imports: [RouterLink, SyncProgress, AccountSkeleton],
   templateUrl: './account.page.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
@@ -125,6 +127,20 @@ export class AccountPage {
     return this.report.value().warnings.filter((w) => year === null || taxYear(w.date) === year);
   });
 
+  /** Estimated tax withheld abroad on the period's dividends. */
+  protected readonly dividendTax = computed(() => {
+    if (!this.report.hasValue()) return null;
+    const year = this.year();
+    const dividends = this.report
+      .value()
+      .dividends.filter((d) => year === null || taxYear(d.date) === year);
+    if (!dividends.length) return null;
+    return {
+      gross: sumMoney(dividends.map((d) => d.grossAccount ?? d.net)),
+      withheld: sumMoney(dividends.map((d) => d.withheld)),
+    };
+  });
+
   protected readonly tab = signal<Tab>('sales');
   protected readonly kindFilter = signal<LedgerKind | ''>('');
   protected readonly search = signal('');
@@ -145,20 +161,27 @@ export class AccountPage {
     const rows = this.entries.value();
     if (!term) return rows;
     return rows.filter((e) =>
-      [e.ticker, e.isin, e.instrumentName].some((v) => v?.toLowerCase().includes(term)),
+      [e.displayTicker, e.ticker, e.isin, e.instrumentName].some((v) =>
+        v?.toLowerCase().includes(term),
+      ),
     );
   });
 
   protected readonly actionError = signal<string | null>(null);
   protected readonly syncRequested = signal(false);
 
+  /** Ticks every second while a rate-limit countdown is shown. */
+  protected readonly now = signal(Date.now());
+
   constructor() {
-    // Poll the account while a sync is queued or running.
-    effect((onCleanup) => {
-      if (!this.syncing()) return;
-      const timer = setTimeout(() => this.account.reload(), 2000);
-      onCleanup(() => clearTimeout(timer));
-    });
+    // Poll the account until the sync ends; the report and ledger then refetch
+    // on their own because they depend on lastSyncedAt.
+    whileActive(this.syncing, 2000, () => this.account.reload());
+    whileActive(
+      () => !!(this.account.hasValue() && this.account.value().syncProgress?.waitingUntil),
+      1000,
+      () => this.now.set(Date.now()),
+    );
   }
 
   protected async syncNow(full = false): Promise<void> {

@@ -2,6 +2,7 @@ import {
   T212ApiError,
   T212RateLimitError,
   type T212AccountSummary,
+  type T212InstrumentMetadata,
   type T212CashTransaction,
   type T212Dividend,
   type T212Environment,
@@ -47,6 +48,11 @@ export class T212Client {
 
   accountSummary(): Promise<T212AccountSummary> {
     return this.get('/api/v0/equity/account/summary');
+  }
+
+  /** Every tradable instrument (~17k). Limited to one call per 50 seconds. */
+  instruments(): Promise<T212InstrumentMetadata[]> {
+    return this.get('/api/v0/equity/metadata/instruments');
   }
 
   /**

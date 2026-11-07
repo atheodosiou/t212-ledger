@@ -45,4 +45,6 @@ npm run dev:web                    # http://localhost:4200, proxies /api to :300
 - Web UI: accounts list + connect form, account page (sync status, tax year, cost method, Trading 212 comparison, Excel/PDF download, sales / movements / holdings).
 - Timeline page: monthly buys/sells chart (with table view) and a per-instrument chart of buys, sells and the average-cost step line (hand-written SVG, no chart library).
 - Verified on a practice account (2026-11-07): `walletImpact.netValue` includes FX fees (BUY: cost + fee, SELL: proceeds - fee). Our realised P&L includes fees; Trading 212's own `realisedProfitLoss` and position cost exclude them, so they differ by exactly the fees.
-- Still to verify with real data: dividend withholding, corporate actions (no such events in the practice account).
+- Verified on a real-money account (2026-11-08, 2 years, 709 trades, 24 dividends): positions match Trading 212 to 8 decimals; cost and realised P&L differ only by FX fees; cash reconciles to the cent. Real accounts use INTEREST_ON_FREE_CASH and WITHDRAW; internal tickers can be pre-merger names (NPA_US_EQ is ASTS), so display tickers come from instrument metadata (cached daily).
+- Dividend tax withheld abroad is not in the API: it is estimated from the gross per share and the FX rate of the nearest trade in that currency, and labelled as an estimate.
+- Not yet seen in real data: corporate actions (splits etc.).

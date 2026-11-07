@@ -175,6 +175,19 @@ describe('computeCostBasis', () => {
     expect(events[1]).toMatchObject({ positionQuantity: '0', averageCost: null });
   });
 
+  it('reports positions under their market ticker, the latest one winning', () => {
+    const asts = { isin: 'US00217D1000', instrumentName: 'AST SpaceMobile' };
+    const result = computeCostBasis(
+      [
+        entry({ kind: 'BUY', occurredAt: at('2024-01-01T00:00:00Z'), quantity: '2', cashAmount: '-20', ticker: 'NPA_US_EQ', displayTicker: 'NPA', ...asts }),
+        entry({ kind: 'SELL', occurredAt: at('2024-06-01T00:00:00Z'), quantity: '-1', cashAmount: '15', ticker: 'NPA_US_EQ', displayTicker: 'ASTS', ...asts }),
+      ],
+      'AVERAGE',
+    );
+    expect(result.sales[0].ticker).toBe('ASTS');
+    expect(result.holdings[0].ticker).toBe('ASTS');
+  });
+
   it('ignores internal transfers', () => {
     const result = computeCostBasis(
       [entry({ kind: 'TRANSFER', occurredAt: at('2025-01-01T00:00:00Z'), cashAmount: '-100' })],

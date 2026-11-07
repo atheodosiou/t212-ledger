@@ -2,8 +2,10 @@ import { Injectable } from '@nestjs/common';
 import { InjectDrizzle } from '@nestjs/drizzle';
 import { and, asc, eq, sql, type SQL } from 'drizzle-orm';
 import type { Db } from '../db/db.js';
+import { fallbackDisplayTicker, InstrumentsService } from '../trading212/instruments.service.js';
 import { ledgerEntries, rawEvents, type LedgerEntry, type NewLedgerEntry } from '../db/schema.js';
 import { computeCostBasis, DEFAULT_TAX_TIME_ZONE, type CostMethod, type EngineResult } from './cost-basis.js';
+import { estimateDividends, type DividendDetail } from './dividends.js';
 import { normalizeRaw, type LedgerKind } from './normalize.js';
 import { buildTimeline, type Timeline } from './timeline.js';
 
@@ -17,7 +19,10 @@ export interface LedgerFilter {
 
 @Injectable()
 export class LedgerService {
-  constructor(@InjectDrizzle() private readonly db: Db) {}
+  constructor(
+    @InjectDrizzle() private readonly db: Db,
+    private readonly instruments: InstrumentsService,
+  ) {}
 
   /** Re-derives the whole ledger of an account from its raw events. Returns the entry count. */
   async rebuild(accountId: string): Promise<number> {
@@ -27,6 +32,11 @@ export class LedgerService {
       for (const raw of raws) {
         const normalized = normalizeRaw(raw.source, raw.payload);
         if (normalized) rows.push({ ...normalized, accountId, rawEventId: raw.id });
+      }
+
+      const names = await this.instruments.displayTickers(rows.map((r) => r.ticker ?? ''));
+      for (const row of rows) {
+        if (row.ticker) row.displayTicker = names.get(row.ticker) ?? fallbackDisplayTicker(row.ticker);
       }
 
       await tx.delete(ledgerEntries).where(eq(ledgerEntries.accountId, accountId));
@@ -59,8 +69,12 @@ export class LedgerService {
   }
 
   /** Replays the full ledger (cost basis needs the whole history, whatever year is reported). */
-  async report(accountId: string, method: CostMethod): Promise<EngineResult> {
+  async report(
+    accountId: string,
+    method: CostMethod,
+    accountCurrency = 'EUR',
+  ): Promise<EngineResult & { dividends: DividendDetail[] }> {
     const entries = await this.list(accountId);
-    return computeCostBasis(entries, method);
+    return { ...computeCostBasis(entries, method), dividends: estimateDividends(entries, accountCurrency) };
   }
 }

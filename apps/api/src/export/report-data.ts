@@ -10,6 +10,7 @@ import {
   type RealisedSale,
   type YearSummary,
 } from '../ledger/cost-basis.js';
+import { estimateDividends, type DividendDetail } from '../ledger/dividends.js';
 import type { LedgerKind } from '../ledger/normalize.js';
 
 /** A ledger row as the export needs it. Numeric fields are decimal strings. */
@@ -41,7 +42,9 @@ export interface ReportData {
   totals: Omit<YearSummary, 'year' | 'holdingsAtYearEnd'>;
   sales: RealisedSale[];
   buys: ExportLedgerEntry[];
-  dividends: ExportLedgerEntry[];
+  dividends: DividendDetail[];
+  /** Estimated gross dividends and tax withheld abroad, per year shown. */
+  dividendTax: Map<number, { gross: string; withheld: string; partial: boolean }>;
   cashMovements: ExportLedgerEntry[];
   corporateActions: ExportLedgerEntry[];
   /** Holdings at the end of the selected year, or now for the whole history / the running year. */
@@ -85,6 +88,18 @@ export function buildReportData(
     TOTAL_FIELDS.map((field) => [field, sumMoney(years.map((y) => y[field]))]),
   ) as ReportData['totals'];
 
+  const dividends = estimateDividends(allEntries, meta.currency).filter((d) => inRange(d.date));
+  const dividendTax = new Map<number, { gross: string; withheld: string; partial: boolean }>();
+  for (const y of years) {
+    const inYear = dividends.filter((d) => yearOf(d.date) === y.year);
+    dividendTax.set(y.year, {
+      gross: sumMoney(inYear.map((d) => d.grossAccount ?? d.net)),
+      withheld: sumMoney(inYear.map((d) => d.withheld ?? '0')),
+      // Some dividends could not be converted, so the totals understate the tax.
+      partial: inYear.some((d) => d.withheld === null),
+    });
+  }
+
   return {
     meta: {
       ...meta,
@@ -96,7 +111,8 @@ export function buildReportData(
     totals,
     sales: engine.sales.filter((s) => inRange(s.date)),
     buys: entries.filter((e) => e.kind === 'BUY'),
-    dividends: entries.filter((e) => e.kind === 'DIVIDEND'),
+    dividends,
+    dividendTax,
     cashMovements: entries.filter((e) => CASH_KINDS.includes(e.kind)),
     corporateActions: entries.filter((e) => e.kind === 'CORPORATE_ACTION'),
     closingHoldings: meta.year === null ? engine.holdings : (years[0]?.holdingsAtYearEnd ?? []),
@@ -157,6 +173,11 @@ export function formatDateTime(date: Date, timeZone: string): string {
 export const FEES_NOTE =
   'Τα ποσά αγορών περιλαμβάνουν τις χρεώσεις (π.χ. μετατροπή νομίσματος) και τα ποσά πωλήσεων είναι μετά τις χρεώσεις. ' +
   'Γι’ αυτό το αποτέλεσμα διαφέρει από το «Realised P&L» του Trading 212, που δεν τις συνυπολογίζει.';
+
+export const DIVIDENDS_NOTE =
+  'Το Trading 212 δίνει το καθαρό μέρισμα σε ευρώ και το μικτό στο νόμισμα του τίτλου, όχι τον φόρο που παρακρατήθηκε. ' +
+  'Το μικτό σε ευρώ και ο φόρος εξωτερικού είναι εκτίμηση, με την ισοτιμία της πλησιέστερης συναλλαγής στο ίδιο νόμισμα. ' +
+  'Για πολύ μικρά ποσά το ποσοστό είναι ανακριβές λόγω στρογγυλοποίησης του καθαρού σε λεπτά.';
 
 export const DISCLAIMER =
   'Η αναφορά παράγεται αυτόματα από τα δεδομένα του Trading 212 API και δεν αποτελεί φορολογική συμβουλή. ' +

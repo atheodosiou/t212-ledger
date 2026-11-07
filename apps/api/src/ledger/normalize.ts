@@ -129,19 +129,35 @@ export function normalizeDividend(item: T212Dividend): NormalizedEntry {
   };
 }
 
+// Practice and real-money accounts use different names for the same thing
+// (e.g. INTEREST vs INTEREST_ON_FREE_CASH, WITHDRAWAL vs WITHDRAW).
 const TRANSACTION_KIND: Record<string, LedgerKind> = {
   DEPOSIT: 'DEPOSIT',
   WITHDRAWAL: 'WITHDRAWAL',
+  WITHDRAW: 'WITHDRAWAL',
   FEE: 'FEE',
   INTEREST: 'INTEREST',
+  INTEREST_ON_FREE_CASH: 'INTEREST',
   TRANSFER_TO_PIE: 'TRANSFER',
   TRANSFER_FROM_PIE: 'TRANSFER',
   TRANSFER_TO_SAVINGS: 'TRANSFER',
   TRANSFER_FROM_SAVINGS: 'TRANSFER',
 };
 
+export function transactionKind(type: string): LedgerKind {
+  const known = TRANSACTION_KIND[type];
+  if (known) return known;
+  // Unseen variants: classify by family, and keep the original type in sourceType for audit.
+  if (type.startsWith('TRANSFER')) return 'TRANSFER';
+  if (type.includes('INTEREST')) return 'INTEREST';
+  if (type.startsWith('WITHDRAW')) return 'WITHDRAWAL';
+  if (type.startsWith('DEPOSIT')) return 'DEPOSIT';
+  if (type.endsWith('FEE')) return 'FEE';
+  return 'OTHER';
+}
+
 export function normalizeTransaction(item: T212CashTransaction): NormalizedEntry {
-  const kind = TRANSACTION_KIND[item.type] ?? 'OTHER';
+  const kind = transactionKind(item.type);
   const amount = d(item.amount);
   return {
     occurredAt: new Date(item.dateTime),

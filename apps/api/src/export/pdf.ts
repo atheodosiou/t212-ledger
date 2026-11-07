@@ -5,6 +5,7 @@ import type { Content, TableCell, TDocumentDefinitions } from 'pdfmake/interface
 import {
   DISCLAIMER,
   displayTicker,
+  DIVIDENDS_NOTE,
   FEES_NOTE,
   formatDate,
   formatDateTime,
@@ -118,6 +119,18 @@ export async function buildPdf(data: ReportData): Promise<Buffer> {
       table: { headerRows: 1, widths: [40, '*', '*', '*', '*', '*', '*', '*', '*'], body: summaryRows },
       layout: 'lightHorizontalLines',
     },
+    ...[...data.dividendTax.entries()]
+      .filter(([, t]) => Number(t.gross) > 0)
+      .map(
+        ([year, t]): Content => ({
+          text: [
+            { text: `Μερίσματα ${year}: `, bold: true },
+            `μικτά ~${money(t.gross)}, φόρος που παρακρατήθηκε στο εξωτερικό ~${money(t.withheld)} (εκτίμηση${t.partial ? ', ελλιπής' : ''}).`,
+          ],
+          style: 'note',
+          margin: [0, 10, 0, 0],
+        }),
+      ),
     { text: FEES_NOTE, style: 'note', margin: [0, 14, 0, 4] },
     data.warnings.length
       ? {
@@ -155,7 +168,7 @@ export async function buildPdf(data: ReportData): Promise<Buffer> {
       'Αγορές',
       [
         { header: 'Ημερομηνία', width: 58, value: (e) => formatDate(e.occurredAt, tz) },
-        { header: 'Ticker', width: 45, value: (e) => displayTicker(e.ticker) },
+        { header: 'Ticker', width: 45, value: (e) => displayTicker(e.displayTicker ?? e.ticker) },
         { header: 'ISIN', width: 78, value: (e) => e.isin ?? '' },
         { header: 'Τίτλος', width: '*', value: (e) => e.instrumentName ?? '' },
         { header: 'Ποσότητα', width: 62, align: 'right', value: (e) => qty(e.quantity) },
@@ -180,20 +193,35 @@ export async function buildPdf(data: ReportData): Promise<Buffer> {
     ...table(
       'Μερίσματα',
       [
-        { header: 'Ημερομηνία', width: 58, value: (e) => formatDate(e.occurredAt, tz) },
-        { header: 'Ticker', width: 45, value: (e) => displayTicker(e.ticker) },
-        { header: 'ISIN', width: 78, value: (e) => e.isin ?? '' },
-        { header: 'Τίτλος', width: '*', value: (e) => e.instrumentName ?? '' },
-        { header: 'Μετοχές', width: 62, align: 'right', value: (e) => qty(e.quantity) },
+        { header: 'Ημερομηνία', width: 54, value: (d) => formatDate(d.date, tz) },
+        { header: 'Ticker', width: 40, value: (d) => displayTicker(d.ticker) },
+        { header: 'ISIN', width: 74, value: (d) => d.isin ?? '' },
+        { header: 'Τίτλος', width: '*', value: (d) => d.instrumentName ?? '' },
         {
-          header: 'Μικτό',
-          width: 70,
+          header: 'Μικτό (τίτλου)',
+          width: 64,
           align: 'right',
-          value: (e) => (e.grossAmount ? `${qty(e.grossAmount)} ${e.instrumentCurrency ?? ''}` : ''),
+          value: (d) => (d.grossInstrument ? `${qty(d.grossInstrument)} ${d.instrumentCurrency ?? ''}` : ''),
         },
-        { header: 'Καθαρό', width: 62, align: 'right', value: (e) => money(e.cashAmount), total: (r) => sum(r, (e) => e.cashAmount) },
+        {
+          header: 'Μικτό € (εκτ.)',
+          width: 58,
+          align: 'right',
+          value: (d) => money(d.grossAccount),
+          total: (r) => sum(r, (d) => d.grossAccount),
+        },
+        {
+          header: 'Φόρος (εκτ.)',
+          width: 54,
+          align: 'right',
+          value: (d) => money(d.withheld),
+          total: (r) => sum(r, (d) => d.withheld),
+        },
+        { header: '%', width: 30, align: 'right', value: (d) => (d.withholdingRate ? `${d.withholdingRate}` : '') },
+        { header: 'Καθαρό', width: 54, align: 'right', value: (d) => money(d.net), total: (r) => sum(r, (d) => d.net) },
       ],
       data.dividends,
+      DIVIDENDS_NOTE,
     ),
 
     ...table(
@@ -232,7 +260,7 @@ export async function buildPdf(data: ReportData): Promise<Buffer> {
             ...data.warnings,
             ...data.corporateActions.map((e) => ({
               date: e.occurredAt,
-              message: `${displayTicker(e.ticker)}: εταιρική πράξη ${e.sourceType}, ποσότητα ${e.quantity}`,
+              message: `${displayTicker(e.displayTicker ?? e.ticker)}: εταιρική πράξη ${e.sourceType}, ποσότητα ${e.quantity}`,
             })),
           ],
         )

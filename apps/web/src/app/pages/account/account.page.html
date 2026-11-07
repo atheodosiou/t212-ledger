@@ -28,13 +28,6 @@
         @if (syncing()) {
           <span class="size-2 animate-pulse rounded-full bg-brand"></span>
           {{ syncLabel[acc.syncStatus] }}
-          @if (acc.syncProgress; as p) {
-            · {{ p.orders }} συναλλαγές, {{ p.transactions }} κινήσεις μετρητών,
-            {{ p.dividends }} μερίσματα
-          }
-          @if (acc.syncProgress?.waitingUntil) {
-            · περιμένουμε το όριο κλήσεων του Trading 212
-          }
         } @else if (acc.syncStatus === 'FAILED') {
           <span class="text-loss">Ο συγχρονισμός απέτυχε: {{ acc.syncError }}</span>
         } @else if (acc.lastSyncedAt) {
@@ -64,22 +57,23 @@
   }
 
   @if (report.isLoading() && !report.hasValue()) {
-    <div class="mt-8 grid gap-3 sm:grid-cols-4">
-      @for (i of [1, 2, 3, 4]; track i) {
-        <div class="h-24 animate-pulse rounded-xl bg-line/60"></div>
-      }
-    </div>
+    <app-account-skeleton class="mt-8" />
   } @else if (report.hasValue() && years().length === 0) {
-    <div
-      class="mt-8 rounded-xl border border-dashed border-line bg-surface p-8 text-center text-sm text-muted"
-    >
-      @if (syncing()) {
-        Φέρνουμε το ιστορικό σου από το Trading 212…
-      } @else {
+    @if (syncing()) {
+      <!-- First sync: show what is happening, and the shape of what is coming. -->
+      <app-sync-progress class="mt-8 block" [account]="acc" [now]="now()" variant="full" />
+      <app-account-skeleton class="mt-6 opacity-90" />
+    } @else {
+      <div
+        class="mt-8 rounded-xl border border-dashed border-line bg-surface p-8 text-center text-sm text-muted"
+      >
         Δεν βρέθηκαν κινήσεις σε αυτόν τον λογαριασμό.
-      }
-    </div>
+      </div>
+    }
   } @else if (summary(); as s) {
+    @if (syncing()) {
+      <app-sync-progress class="mt-6 block" [account]="acc" [now]="now()" variant="compact" />
+    }
     <!-- Controls -->
     <div class="mt-8 flex flex-wrap items-end justify-between gap-4">
       <div class="flex flex-wrap items-end gap-4">
@@ -165,6 +159,11 @@
               }
             </dt>
             <dd class="mt-1 font-semibold">{{ money(s[t.field], cur) }}</dd>
+            @if (t.field === 'dividends' && dividendTax(); as dt) {
+              <p class="mt-1 text-[11px] leading-snug text-muted">
+                μικτά ~{{ money(dt.gross, cur) }} · φόρος εξωτ. ~{{ money(dt.withheld, cur) }}
+              </p>
+            }
           </div>
         }
       </dl>
@@ -307,7 +306,7 @@
                       <td class="whitespace-nowrap px-4 py-2">{{ kindLabel[e.kind] }}</td>
                       <td class="px-4 py-2">
                         @if (e.ticker) {
-                          <span class="font-medium">{{ ticker(e.ticker) }}</span>
+                          <span class="font-medium">{{ ticker(e.displayTicker ?? e.ticker) }}</span>
                           <span class="ml-1 text-muted">{{ e.instrumentName }}</span>
                         }
                       </td>

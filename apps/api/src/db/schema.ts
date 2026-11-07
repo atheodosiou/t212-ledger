@@ -45,10 +45,15 @@ export const brokerAccounts = pgTable(
   (t) => [index('broker_accounts_user_idx').on(t.userId)],
 );
 
+/** Steps of a sync, in order. */
+export type SyncStage = 'ORDERS' | 'DIVIDENDS' | 'TRANSACTIONS' | 'INSTRUMENTS' | 'LEDGER';
+
 export interface SyncProgress {
   orders: number;
   dividends: number;
   transactions: number;
+  /** The step currently running. */
+  stage?: SyncStage | null;
   /** Set while the sync is waiting out a Trading 212 rate-limit window. */
   waitingUntil?: string | null;
 }
@@ -100,7 +105,10 @@ export const ledgerEntries = pgTable(
     kind: ledgerKind().notNull(),
     /** Original Trading 212 type (e.g. TRADE, STOCK_SPLIT, DEPOSIT, INTEREST) for audit. */
     sourceType: text('source_type').notNull(),
+    /** Trading 212 internal ticker, e.g. NPA_US_EQ. Can be a pre-merger name. */
     ticker: text(),
+    /** Market ticker people know, e.g. ASTS, from instrument metadata. */
+    displayTicker: text('display_ticker'),
     isin: text(),
     instrumentName: text('instrument_name'),
     instrumentCurrency: text('instrument_currency'),
@@ -126,6 +134,20 @@ export const ledgerEntries = pgTable(
     index('ledger_entries_account_ticker_idx').on(t.accountId, t.ticker),
   ],
 );
+
+/**
+ * Trading 212 instrument metadata, shared by all accounts. Refreshed at most once a
+ * day because the endpoint allows one call per 50 seconds and returns ~17k rows.
+ */
+export const instruments = pgTable('instruments', {
+  ticker: text().primaryKey(),
+  shortName: text('short_name').notNull(),
+  name: text(),
+  isin: text(),
+  currency: text(),
+  type: text(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
 
 export type BrokerAccount = typeof brokerAccounts.$inferSelect;
 export type RawEvent = typeof rawEvents.$inferSelect;

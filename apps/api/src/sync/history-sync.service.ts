@@ -4,7 +4,7 @@ import { eq } from 'drizzle-orm';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { AccountsService } from '../accounts/accounts.service.js';
 import type { Db } from '../db/db.js';
-import { brokerAccounts, rawEvents, type SyncProgress } from '../db/schema.js';
+import { brokerAccounts, rawEvents, type SyncProgress, type SyncStage } from '../db/schema.js';
 import { LedgerService } from '../ledger/ledger.service.js';
 import {
   dividendIdentity,
@@ -13,10 +13,17 @@ import {
   type RawIdentity,
   type RawSource,
 } from '../ledger/normalize.js';
+import { InstrumentsService } from '../trading212/instruments.service.js';
 import { HISTORY_PATHS, type T212Client } from '../trading212/t212.client.js';
 import { T212RateLimitError } from '../trading212/t212.types.js';
 
-const PROGRESS_KEY: Record<RawSource, keyof Omit<SyncProgress, 'waitingUntil'>> = {
+const STAGE_OF: Record<RawSource, SyncStage> = {
+  ORDER: 'ORDERS',
+  DIVIDEND: 'DIVIDENDS',
+  TRANSACTION: 'TRANSACTIONS',
+};
+
+const PROGRESS_KEY: Record<RawSource, 'orders' | 'dividends' | 'transactions'> = {
   ORDER: 'orders',
   DIVIDEND: 'dividends',
   TRANSACTION: 'transactions',
@@ -38,6 +45,7 @@ export class HistorySyncService {
     @InjectDrizzle() private readonly db: Db,
     private readonly accounts: AccountsService,
     private readonly ledger: LedgerService,
+    private readonly instruments: InstrumentsService,
   ) {}
 
   /**
@@ -50,18 +58,31 @@ export class HistorySyncService {
     if (!account) return;
 
     const client = this.accounts.clientFor(account);
-    const progress: SyncProgress = { orders: 0, dividends: 0, transactions: 0, waitingUntil: null };
+    const progress: SyncProgress = { orders: 0, dividends: 0, transactions: 0, stage: 'ORDERS', waitingUntil: null };
     await this.setState(accountId, { syncStatus: 'RUNNING', syncError: null, syncProgress: progress });
+    const enter = (stage: SyncStage) => {
+      progress.stage = stage;
+      return this.setState(accountId, { syncProgress: { ...progress } });
+    };
 
     try {
       for (const source of ['ORDER', 'DIVIDEND', 'TRANSACTION'] as const) {
+        await enter(STAGE_OF[source]);
         await this.syncStream(client, accountId, source, full, progress, signal);
       }
+      await enter('INSTRUMENTS');
+      try {
+        await this.withRateLimit(accountId, progress, () => this.instruments.refreshIfStale(client), signal);
+      } catch (error) {
+        // Display tickers are a nicety: keep the last known names rather than fail the sync.
+        this.logger.warn(`Instrument metadata not refreshed: ${error instanceof Error ? error.message : String(error)}`);
+      }
+      await enter('LEDGER');
       const entries = await this.ledger.rebuild(accountId);
       this.logger.log(`Account ${accountId}: synced ${JSON.stringify(progress)}, ${entries} ledger entries`);
       await this.setState(accountId, {
         syncStatus: 'IDLE',
-        syncProgress: { ...progress, waitingUntil: null },
+        syncProgress: { ...progress, stage: null, waitingUntil: null },
         lastSyncedAt: new Date(),
       });
     } catch (error) {

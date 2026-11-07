@@ -10,6 +10,8 @@ export interface EngineEntry {
   kind: LedgerKind;
   sourceType: string;
   ticker: string | null;
+  /** Market ticker (e.g. ASTS for NPA_US_EQ); preferred in output when present. */
+  displayTicker?: string | null;
   isin: string | null;
   instrumentName: string | null;
   quantity: string | null;
@@ -298,10 +300,15 @@ export function computeCostBasis(
 
 function position(positions: Map<string, Position>, entry: EngineEntry): Position {
   const key = entry.isin ?? entry.ticker ?? 'UNKNOWN';
+  const ticker = entry.displayTicker ?? entry.ticker ?? key;
   let pos = positions.get(key);
   if (!pos) {
-    pos = { ticker: entry.ticker ?? key, isin: entry.isin, instrumentName: entry.instrumentName, lots: [] };
+    pos = { ticker, isin: entry.isin, instrumentName: entry.instrumentName, lots: [] };
     positions.set(key, pos);
+  } else {
+    // Latest names win, so a renamed company shows under its current ticker.
+    pos.ticker = ticker;
+    if (entry.instrumentName) pos.instrumentName = entry.instrumentName;
   }
   return pos;
 }

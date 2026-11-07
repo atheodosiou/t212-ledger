@@ -85,7 +85,10 @@ export function isSyncing(status: SyncStatus | undefined): boolean {
 }
 
 /** Reads the `message` of a Nest error response, whatever its shape. */
-export function apiErrorMessage(error: unknown, fallback = 'Κάτι πήγε στραβά. Δοκίμασε ξανά.'): string {
+export function apiErrorMessage(
+  error: unknown,
+  fallback = 'Κάτι πήγε στραβά. Δοκίμασε ξανά.',
+): string {
   const body = (error as { error?: { message?: string | string[] } })?.error;
   const message = body?.message;
   if (Array.isArray(message)) return message.join(' · ');

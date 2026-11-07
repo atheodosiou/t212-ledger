@@ -2,6 +2,7 @@ import ExcelJS from 'exceljs';
 import {
   DISCLAIMER,
   displayTicker,
+  DIVIDENDS_NOTE,
   FEES_NOTE,
   formatDate,
   formatDateTime,
@@ -115,6 +116,20 @@ export async function buildXlsx(data: ReportData): Promise<Buffer> {
       { header: 'Έσοδα πωλήσεων (μετά χρεώσεων)', width: 20, type: 'money', value: (y) => num(y.saleProceeds), total: true },
       { header: 'Αποτέλεσμα πωλήσεων', width: 18, type: 'money', value: (y) => num(y.realisedPnl), total: true },
       { header: 'Μερίσματα (καθαρά)', width: 16, type: 'money', value: (y) => num(y.dividends), total: true },
+      {
+        header: 'Μερίσματα μικτά (εκτίμηση)',
+        width: 16,
+        type: 'money',
+        value: (y) => num(data.dividendTax.get(y.year)?.gross ?? null),
+        total: true,
+      },
+      {
+        header: 'Φόρος εξωτερικού (εκτίμηση)',
+        width: 16,
+        type: 'money',
+        value: (y) => num(data.dividendTax.get(y.year)?.withheld ?? null),
+        total: true,
+      },
       { header: 'Τόκοι', width: 12, type: 'money', value: (y) => num(y.interest), total: true },
       { header: 'Χρεώσεις', width: 12, type: 'money', value: (y) => num(y.fees), total: true },
     ],
@@ -134,13 +149,14 @@ export async function buildXlsx(data: ReportData): Promise<Buffer> {
     ['Δημιουργήθηκε', formatDateTime(meta.generatedAt, tz)],
     ['Προειδοποιήσεις', data.warnings.length ? `${data.warnings.length} (βλ. φύλλο «Έλεγχος»)` : 'Καμία'],
     ['Σημείωση', FEES_NOTE],
+    ['Μερίσματα', DIVIDENDS_NOTE],
     ['Αποποίηση', DISCLAIMER],
   ];
   let r = 4 + data.years.length + 3;
   for (const [label, value] of info) {
     summary.getCell(`A${r}`).value = label;
     summary.getCell(`A${r}`).font = { bold: true };
-    summary.mergeCells(`B${r}:I${r}`);
+    summary.mergeCells(`B${r}:K${r}`);
     summary.getCell(`B${r}`).value = value;
     summary.getCell(`B${r}`).alignment = { wrapText: true, vertical: 'top' };
     if (value.length > 90) summary.getRow(r).height = 32;
@@ -172,7 +188,7 @@ export async function buildXlsx(data: ReportData): Promise<Buffer> {
     `Αγορές τίτλων · ${period}`,
     [
       { header: 'Ημερομηνία', width: 17, type: 'date', value: (e) => e.occurredAt },
-      { header: 'Ticker', width: 10, type: 'text', value: (e) => displayTicker(e.ticker) },
+      { header: 'Ticker', width: 10, type: 'text', value: (e) => displayTicker(e.displayTicker ?? e.ticker) },
       { header: 'ISIN', width: 15, type: 'text', value: (e) => e.isin },
       { header: 'Τίτλος', width: 30, type: 'text', value: (e) => e.instrumentName },
       { header: 'Ποσότητα', width: 13, type: 'qty', value: (e) => num(e.quantity) },
@@ -190,17 +206,30 @@ export async function buildXlsx(data: ReportData): Promise<Buffer> {
     'Μερίσματα',
     `Μερίσματα · ${period}`,
     [
-      { header: 'Ημερομηνία', width: 17, type: 'date', value: (e) => e.occurredAt },
-      { header: 'Ticker', width: 10, type: 'text', value: (e) => displayTicker(e.ticker) },
-      { header: 'ISIN', width: 15, type: 'text', value: (e) => e.isin },
-      { header: 'Τίτλος', width: 30, type: 'text', value: (e) => e.instrumentName },
-      { header: 'Μετοχές', width: 13, type: 'qty', value: (e) => num(e.quantity) },
-      { header: 'Μικτό ποσό (νόμισμα τίτλου)', width: 15, type: 'price', value: (e) => num(e.grossAmount) },
-      { header: 'Νόμισμα', width: 9, type: 'text', value: (e) => e.instrumentCurrency },
-      { header: 'Καθαρό ποσό που πιστώθηκε', width: 15, type: 'money', value: (e) => num(e.cashAmount), total: true },
+      { header: 'Ημερομηνία', width: 17, type: 'date', value: (d) => d.date },
+      { header: 'Ticker', width: 10, type: 'text', value: (d) => displayTicker(d.ticker) },
+      { header: 'ISIN', width: 15, type: 'text', value: (d) => d.isin },
+      { header: 'Τίτλος', width: 28, type: 'text', value: (d) => d.instrumentName },
+      { header: 'Μετοχές', width: 12, type: 'qty', value: (d) => num(d.shares) },
+      { header: 'Μικτό (νόμισμα τίτλου)', width: 13, type: 'price', value: (d) => num(d.grossInstrument) },
+      { header: 'Νόμισμα', width: 8, type: 'text', value: (d) => d.instrumentCurrency },
+      { header: 'Ισοτιμία', width: 10, type: 'price', value: (d) => num(d.fxRate) },
+      { header: 'Μικτό σε € (εκτίμηση)', width: 14, type: 'money', value: (d) => num(d.grossAccount), total: true },
+      { header: 'Φόρος εξωτερικού (εκτίμηση)', width: 14, type: 'money', value: (d) => num(d.withheld), total: true },
+      { header: 'Ποσοστό %', width: 9, type: 'price', value: (d) => num(d.withholdingRate) },
+      { header: 'Καθαρό που πιστώθηκε', width: 14, type: 'money', value: (d) => num(d.net), total: true },
     ],
     data.dividends,
   );
+  if (data.dividends.length) {
+    const ws = wb.getWorksheet('Μερίσματα')!;
+    const r = 4 + data.dividends.length + 2;
+    ws.mergeCells(`A${r}:L${r}`);
+    ws.getCell(`A${r}`).value = DIVIDENDS_NOTE;
+    ws.getCell(`A${r}`).alignment = { wrapText: true, vertical: 'top' };
+    ws.getCell(`A${r}`).font = { italic: true, color: { argb: 'FF4B5563' } };
+    ws.getRow(r).height = 32;
+  }
 
   // ── Μετρητά ───────────────────────────────────────────────────────────────
   addTable(
@@ -237,7 +266,7 @@ export async function buildXlsx(data: ReportData): Promise<Buffer> {
     [
       { header: 'Ημερομηνία', width: 17, type: 'date', value: (e) => e.occurredAt },
       { header: 'Είδος', width: 16, type: 'text', value: (e) => KIND_LABEL[e.kind] },
-      { header: 'Ticker', width: 10, type: 'text', value: (e) => displayTicker(e.ticker) },
+      { header: 'Ticker', width: 10, type: 'text', value: (e) => displayTicker(e.displayTicker ?? e.ticker) },
       { header: 'ISIN', width: 15, type: 'text', value: (e) => e.isin },
       { header: 'Τίτλος', width: 30, type: 'text', value: (e) => e.instrumentName },
       { header: 'Ποσότητα', width: 13, type: 'qty', value: (e) => num(e.quantity) },
@@ -264,7 +293,7 @@ export async function buildXlsx(data: ReportData): Promise<Buffer> {
         ...data.corporateActions.map((e) => ({
           entryId: e.id,
           date: e.occurredAt,
-          message: `${displayTicker(e.ticker)}: εταιρική πράξη ${e.sourceType}, ποσότητα ${e.quantity}`,
+          message: `${displayTicker(e.displayTicker ?? e.ticker)}: εταιρική πράξη ${e.sourceType}, ποσότητα ${e.quantity}`,
         })),
       ],
     );

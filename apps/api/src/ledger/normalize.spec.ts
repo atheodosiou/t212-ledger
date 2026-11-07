@@ -1,5 +1,5 @@
 import type { T212OrderItem } from '../trading212/t212.types.js';
-import { normalizeDividend, normalizeOrder, normalizeTransaction, orderIdentity } from './normalize.js';
+import { normalizeDividend, normalizeOrder, normalizeTransaction, orderIdentity, transactionKind } from './normalize.js';
 
 const btdr = { ticker: 'BTDR_US_EQ', name: 'Bitdeer Technologies Group', isin: 'KYG112481015', currency: 'USD' };
 
@@ -111,6 +111,19 @@ describe('normalizeTransaction', () => {
       fees: '1.4',
     });
     expect(normalizeTransaction({ ...base, amount: 0.01, reference: 'c', type: 'INTEREST' }).kind).toBe('INTEREST');
+  });
+
+  it('understands the type names used by real-money accounts', () => {
+    const base = { currency: 'EUR', dateTime: '2024-11-19T16:49:19Z', reference: 'r' };
+    expect(normalizeTransaction({ ...base, amount: 0.11, type: 'INTEREST_ON_FREE_CASH' }).kind).toBe('INTEREST');
+    expect(normalizeTransaction({ ...base, amount: -4.95, type: 'WITHDRAW' }).kind).toBe('WITHDRAWAL');
+  });
+
+  it('classifies unseen variants by family', () => {
+    expect(transactionKind('INTEREST_ON_SAVINGS')).toBe('INTEREST');
+    expect(transactionKind('TRANSFER_TO_CARD')).toBe('TRANSFER');
+    expect(transactionKind('CURRENCY_CONVERSION_FEE')).toBe('FEE');
+    expect(transactionKind('CARD_CASHBACK')).toBe('OTHER');
   });
 
   it('keeps unknown types as OTHER with a note', () => {

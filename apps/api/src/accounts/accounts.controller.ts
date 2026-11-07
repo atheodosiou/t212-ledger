@@ -114,7 +114,7 @@ export class AccountsController {
     @Param('id', { schema: accountIdSchema }) id: string,
     @Query({ schema: reportQuerySchema }) query: z.infer<typeof reportQuerySchema>,
   ) {
-    await this.accounts.get(user.id, id);
-    return this.ledger.report(id, query.method);
+    const account = await this.accounts.get(user.id, id);
+    return this.ledger.report(id, query.method, account.accountCurrency);
   }
 }

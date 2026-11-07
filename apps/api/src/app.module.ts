@@ -6,6 +6,7 @@ import { AccountsController } from './accounts/accounts.controller.js';
 import { AccountsService } from './accounts/accounts.service.js';
 import { validateEnv, type Env } from './config/env.js';
 import { EncryptionService } from './crypto/encryption.service.js';
+import { InstrumentsService } from './trading212/instruments.service.js';
 import { ExportService } from './export/export.service.js';
 import * as schema from './db/schema.js';
 import { LedgerService } from './ledger/ledger.service.js';
@@ -30,6 +31,7 @@ import { DevUserGuard } from './users/current-user.js';
     EncryptionService,
     AccountsService,
     LedgerService,
+    InstrumentsService,
     ExportService,
     HistorySyncService,
     SyncQueueService,

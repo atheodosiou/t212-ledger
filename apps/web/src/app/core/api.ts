@@ -13,7 +13,9 @@ export class Api {
   }
 
   sync(accountId: string, full = false): Promise<{ queued: boolean }> {
-    return firstValueFrom(this.http.post<{ queued: boolean }>(`/api/accounts/${accountId}/sync`, { full }));
+    return firstValueFrom(
+      this.http.post<{ queued: boolean }>(`/api/accounts/${accountId}/sync`, { full }),
+    );
   }
 
   deleteAccount(accountId: string): Promise<void> {
@@ -21,7 +23,12 @@ export class Api {
   }
 }
 
-export function exportUrl(accountId: string, format: ExportFormat, method: CostMethod, year: number | null): string {
+export function exportUrl(
+  accountId: string,
+  format: ExportFormat,
+  method: CostMethod,
+  year: number | null,
+): string {
   const params = new URLSearchParams({ format, method });
   if (year !== null) params.set('year', String(year));
   return `/api/accounts/${accountId}/export?${params}`;

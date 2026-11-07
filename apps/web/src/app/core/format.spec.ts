@@ -32,7 +32,9 @@ describe('format', () => {
   });
 
   it('builds export links', () => {
-    expect(exportUrl('abc', 'pdf', 'FIFO', null)).toBe('/api/accounts/abc/export?format=pdf&method=FIFO');
+    expect(exportUrl('abc', 'pdf', 'FIFO', null)).toBe(
+      '/api/accounts/abc/export?format=pdf&method=FIFO',
+    );
     expect(exportUrl('abc', 'xlsx', 'AVERAGE', 2026)).toContain('year=2026');
   });
 });

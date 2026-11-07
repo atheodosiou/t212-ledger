@@ -105,3 +105,14 @@ export class T212RateLimitError extends T212ApiError {
     this.name = 'T212RateLimitError';
   }
 }
+
+/** Item of /equity/metadata/instruments. */
+export interface T212InstrumentMetadata {
+  ticker: string;
+  /** The market ticker people know (e.g. ASTS for NPA_US_EQ). */
+  shortName: string;
+  name?: string;
+  isin?: string;
+  currencyCode?: string;
+  type?: string;
+}

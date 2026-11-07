@@ -17,10 +17,13 @@ export type LedgerKind =
   | 'CORPORATE_ACTION'
   | 'OTHER';
 
+export type SyncStage = 'ORDERS' | 'DIVIDENDS' | 'TRANSACTIONS' | 'INSTRUMENTS' | 'LEDGER';
+
 export interface SyncProgressDto {
   orders: number;
   dividends: number;
   transactions: number;
+  stage?: SyncStage | null;
   waitingUntil?: string | null;
 }
 
@@ -50,6 +53,8 @@ export interface LedgerEntryDto {
   kind: LedgerKind;
   sourceType: string;
   ticker: string | null;
+  /** Market ticker (e.g. ASTS); Trading 212 internal tickers can be pre-merger names. */
+  displayTicker: string | null;
   isin: string | null;
   instrumentName: string | null;
   instrumentCurrency: string | null;
@@ -145,10 +150,28 @@ export interface TimelineDto {
   instruments: InstrumentTimelineDto[];
 }
 
+export interface DividendDetailDto {
+  entryId: string;
+  date: string;
+  ticker: string;
+  isin: string | null;
+  instrumentName: string | null;
+  shares: string | null;
+  grossInstrument: string | null;
+  instrumentCurrency: string | null;
+  net: string;
+  fxRate: string | null;
+  grossAccount: string | null;
+  withheld: string | null;
+  withholdingRate: string | null;
+  estimated: boolean;
+}
+
 export interface ReportDto {
   method: CostMethod;
   sales: RealisedSaleDto[];
   holdings: HoldingDto[];
   years: YearSummaryDto[];
   warnings: { entryId: string; date: string; message: string }[];
+  dividends: DividendDetailDto[];
 }
