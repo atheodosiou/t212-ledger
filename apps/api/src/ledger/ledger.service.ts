@@ -1,15 +1,54 @@
 import { Injectable } from '@nestjs/common';
 import { InjectDrizzle } from '@nestjs/drizzle';
-import { and, asc, eq, sql, type SQL } from 'drizzle-orm';
+import { Decimal } from 'decimal.js';
+import { and, asc, count, desc, eq, ilike, or, sql, type SQL } from 'drizzle-orm';
 import type { Db } from '../db/db.js';
 import { fallbackDisplayTicker, InstrumentsService } from '../trading212/instruments.service.js';
 import { ledgerEntries, rawEvents, type LedgerEntry, type NewLedgerEntry } from '../db/schema.js';
-import { computeCostBasis, DEFAULT_TAX_TIME_ZONE, type CostMethod, type EngineResult } from './cost-basis.js';
+import {
+  computeCostBasis,
+  DEFAULT_TAX_TIME_ZONE,
+  taxYearOf,
+  type CostMethod,
+  type EngineResult,
+  type RealisedSale,
+} from './cost-basis.js';
 import { estimateDividends, type DividendDetail } from './dividends.js';
 import { normalizeRaw, type LedgerKind } from './normalize.js';
+import { matches, pageInMemory, toPage, type Page, type PageRequest } from './paging.js';
 import { buildTimeline, type Timeline } from './timeline.js';
 
 const INSERT_CHUNK = 500;
+
+export const LEDGER_SORT_COLUMNS = {
+  date: ledgerEntries.occurredAt,
+  kind: ledgerEntries.kind,
+  ticker: ledgerEntries.displayTicker,
+  quantity: ledgerEntries.quantity,
+  price: ledgerEntries.price,
+  fees: ledgerEntries.fees,
+  cash: ledgerEntries.cashAmount,
+} as const;
+export type LedgerSort = keyof typeof LEDGER_SORT_COLUMNS;
+
+export const SALE_SORTS = [
+  'date',
+  'ticker',
+  'quantity',
+  'proceeds',
+  'costBasis',
+  'realisedPnl',
+  'brokerRealisedPnl',
+] as const;
+export type SaleSort = (typeof SALE_SORTS)[number];
+
+export interface SalesTotals {
+  proceeds: string;
+  costBasis: string;
+  realisedPnl: string;
+  brokerRealisedPnl: string;
+  fees: string;
+}
 
 export interface LedgerFilter {
   year?: number;
@@ -62,6 +101,78 @@ export class LedgerService {
       .from(ledgerEntries)
       .where(and(...conditions))
       .orderBy(asc(ledgerEntries.occurredAt));
+  }
+
+  /** One page of ledger entries, filtered and sorted in the database. */
+  async page(
+    accountId: string,
+    filter: { year?: number; kind?: LedgerKind; q?: string },
+    req: PageRequest<LedgerSort>,
+  ): Promise<Page<LedgerEntry>> {
+    const conditions: SQL[] = [eq(ledgerEntries.accountId, accountId)];
+    if (filter.year) {
+      conditions.push(
+        sql`extract(year from ${ledgerEntries.occurredAt} at time zone ${DEFAULT_TAX_TIME_ZONE}) = ${filter.year}`,
+      );
+    }
+    if (filter.kind) conditions.push(eq(ledgerEntries.kind, filter.kind));
+    if (filter.q?.trim()) {
+      const like = `%${filter.q.trim().replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+      conditions.push(
+        or(
+          ilike(ledgerEntries.displayTicker, like),
+          ilike(ledgerEntries.ticker, like),
+          ilike(ledgerEntries.isin, like),
+          ilike(ledgerEntries.instrumentName, like),
+        )!,
+      );
+    }
+    const where = and(...conditions);
+    const column = LEDGER_SORT_COLUMNS[req.sort];
+    const order = req.dir === 'asc' ? asc(column) : desc(column);
+    // Nulls last either way; id as a stable tie-breaker so pages never overlap.
+    const nullsLast = sql`${column} is null`;
+
+    const [items, [{ total }]] = await Promise.all([
+      this.db
+        .select()
+        .from(ledgerEntries)
+        .where(where)
+        .orderBy(nullsLast, order, asc(ledgerEntries.occurredAt), asc(ledgerEntries.id))
+        .limit(req.limit)
+        .offset(req.offset),
+      this.db.select({ total: count() }).from(ledgerEntries).where(where),
+    ]);
+    return toPage(items, total, req);
+  }
+
+  /** One page of realised sales, with totals for everything that matches the filter. */
+  async salesPage(
+    accountId: string,
+    method: CostMethod,
+    filter: { year?: number; q?: string },
+    req: PageRequest<SaleSort>,
+  ): Promise<Page<RealisedSale> & { totals: SalesTotals }> {
+    const yearOf = taxYearOf(DEFAULT_TAX_TIME_ZONE);
+    const { sales } = computeCostBasis(await this.list(accountId), method);
+    const filtered = sales.filter(
+      (s) =>
+        (!filter.year || yearOf(s.date) === filter.year) &&
+        matches(filter.q, s.ticker, s.isin, s.instrumentName),
+    );
+    const sum = (pick: (s: RealisedSale) => string | null) =>
+      filtered.reduce((acc, s) => acc.plus(pick(s) ?? 0), new Decimal(0)).toFixed(2);
+    const page = pageInMemory(filtered, req, (s, sort) => (sort === 'date' ? s.date : s[sort]));
+    return {
+      ...page,
+      totals: {
+        proceeds: sum((s) => s.proceeds),
+        costBasis: sum((s) => s.costBasis),
+        realisedPnl: sum((s) => s.realisedPnl),
+        brokerRealisedPnl: sum((s) => s.brokerRealisedPnl),
+        fees: sum((s) => s.sellFees),
+      },
+    };
   }
 
   async timeline(accountId: string, method: CostMethod): Promise<Timeline> {

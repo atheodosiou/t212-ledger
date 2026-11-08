@@ -2,7 +2,7 @@ import { Body, Controller, Delete, Get, HttpCode, Param, Post, Query, Streamable
 import { z } from 'zod';
 import { ExportService } from '../export/export.service.js';
 import { PortfolioService } from '../portfolio/portfolio.service.js';
-import { LedgerService } from '../ledger/ledger.service.js';
+import { LEDGER_SORT_COLUMNS, LedgerService, SALE_SORTS, type LedgerSort } from '../ledger/ledger.service.js';
 import { SyncQueueService } from '../sync/sync-queue.service.js';
 import { CurrentUser, DevUserGuard, type CurrentUserData } from '../users/current-user.js';
 import {
@@ -14,12 +14,26 @@ import {
 } from './accounts.schemas.js';
 import { AccountsService, toView } from './accounts.service.js';
 
-const ledgerQuerySchema = z.object({
+const pageSchema = {
+  dir: z.enum(['asc', 'desc']).default('desc'),
+  limit: z.coerce.number().int().min(1).max(200).default(50),
+  offset: z.coerce.number().int().min(0).default(0),
   year: z.coerce.number().int().min(2000).max(2100).optional(),
-  ticker: z.string().max(40).optional(),
+  q: z.string().trim().max(60).optional(),
+};
+
+const ledgerQuerySchema = z.object({
+  ...pageSchema,
+  sort: z.enum(Object.keys(LEDGER_SORT_COLUMNS) as [LedgerSort, ...LedgerSort[]]).default('date'),
   kind: z
     .enum(['BUY', 'SELL', 'DEPOSIT', 'WITHDRAWAL', 'DIVIDEND', 'INTEREST', 'FEE', 'TRANSFER', 'CORPORATE_ACTION', 'OTHER'])
     .optional(),
+});
+
+const salesQuerySchema = z.object({
+  ...pageSchema,
+  sort: z.enum(SALE_SORTS).default('date'),
+  method: z.enum(['AVERAGE', 'FIFO']).default('AVERAGE'),
 });
 
 const reportQuerySchema = z.object({ method: z.enum(['AVERAGE', 'FIFO']).default('AVERAGE') });
@@ -82,7 +96,19 @@ export class AccountsController {
     @Query({ schema: ledgerQuerySchema }) query: z.infer<typeof ledgerQuerySchema>,
   ) {
     await this.accounts.get(user.id, id);
-    return this.ledger.list(id, query);
+    const { sort, dir, limit, offset, ...filter } = query;
+    return this.ledger.page(id, filter, { sort, dir, limit, offset });
+  }
+
+  @Get(':id/sales')
+  async sales(
+    @CurrentUser() user: CurrentUserData,
+    @Param('id', { schema: accountIdSchema }) id: string,
+    @Query({ schema: salesQuerySchema }) query: z.infer<typeof salesQuerySchema>,
+  ) {
+    await this.accounts.get(user.id, id);
+    const { sort, dir, limit, offset, method, ...filter } = query;
+    return this.ledger.salesPage(id, method, filter, { sort, dir, limit, offset });
   }
 
   /** Live value, total result and its breakdown, open positions. */

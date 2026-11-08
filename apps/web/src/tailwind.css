@@ -20,3 +20,14 @@
     font-feature-settings: 'tnum' 1, 'cv11' 1;
   }
 }
+
+:root {
+  /* Where the sticky part of the page ends; set by the StickyTop directive. */
+  --sticky-bottom: 56px;
+}
+
+@utility sticky-head {
+  position: sticky;
+  top: var(--sticky-bottom);
+  z-index: 10;
+}

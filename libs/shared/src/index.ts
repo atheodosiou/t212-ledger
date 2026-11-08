@@ -209,3 +209,19 @@ export interface PortfolioDto {
   /** True when Trading 212 rate-limited us and this is the last good snapshot. */
   stale: boolean;
 }
+
+export type SortDir = 'asc' | 'desc';
+export type LedgerSort = 'date' | 'kind' | 'ticker' | 'quantity' | 'price' | 'fees' | 'cash';
+export type SaleSort = 'date' | 'ticker' | 'quantity' | 'proceeds' | 'costBasis' | 'realisedPnl' | 'brokerRealisedPnl';
+
+export interface PageDto<T> {
+  items: T[];
+  total: number;
+  offset: number;
+  limit: number;
+  nextOffset: number | null;
+}
+
+export interface SalesPageDto extends PageDto<RealisedSaleDto> {
+  totals: { proceeds: string; costBasis: string; realisedPnl: string; brokerRealisedPnl: string; fees: string };
+}

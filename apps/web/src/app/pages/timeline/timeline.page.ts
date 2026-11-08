@@ -7,31 +7,32 @@ import {
   linkedSignal,
   signal,
 } from '@angular/core';
-import { RouterLink } from '@angular/router';
-import type { AccountDto, CostMethod, InstrumentTimelineDto, TimelineDto } from '@t212/shared';
+import type { CostMethod, InstrumentTimelineDto, TimelineDto } from '@t212/shared';
+import { accountState } from '../../core/account-state';
 import { date, money, qty, sumMoney, ticker } from '../../core/format';
+import { AccountHeader } from '../../ui/account-header';
+import { SyncProgress } from '../../ui/sync-progress';
+import { StickyTop } from '../../ui/table';
 import { InstrumentChart } from './instrument-chart';
 import { MonthlyChart } from './monthly-chart';
 
 @Component({
   selector: 'app-timeline-page',
-  imports: [RouterLink, MonthlyChart, InstrumentChart],
+  imports: [AccountHeader, StickyTop, SyncProgress, MonthlyChart, InstrumentChart],
   templateUrl: './timeline.page.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class TimelinePage {
   readonly id = input.required<string>();
 
-  protected readonly account = httpResource<AccountDto>(() => `/api/accounts/${this.id()}`);
-  protected readonly currency = computed(() =>
-    this.account.hasValue() ? this.account.value().accountCurrency : 'EUR',
-  );
+  protected readonly state = accountState(() => this.id());
+  protected readonly currency = computed(() => this.state.value()?.accountCurrency ?? 'EUR');
 
   protected readonly method = signal<CostMethod>('AVERAGE');
-  protected readonly timeline = httpResource<TimelineDto>(() => ({
-    url: `/api/accounts/${this.id()}/timeline`,
-    params: { method: this.method() },
-  }));
+  protected readonly timeline = httpResource<TimelineDto>(() => {
+    this.state.syncedAt(); // refetch once a sync finishes
+    return { url: `/api/accounts/${this.id()}/timeline`, params: { method: this.method() } };
+  });
 
   protected readonly instruments = computed(() =>
     this.timeline.hasValue() ? this.timeline.value().instruments : [],

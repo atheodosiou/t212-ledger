@@ -33,7 +33,8 @@ npm run dev:web                    # http://localhost:4200, proxies /api to :300
 | GET | `/api/accounts` | connected accounts |
 | POST | `/api/accounts` | `{ label, environment: DEMO\|LIVE, apiKey, apiSecret }`, validates the key, starts a full sync |
 | POST | `/api/accounts/:id/sync` | `{ full?: boolean }` |
-| GET | `/api/accounts/:id/ledger` | `?year=&ticker=&kind=` |
+| GET | `/api/accounts/:id/ledger` | paged: `?year=&kind=&q=&sort=&dir=&limit=&offset=` (sort: date, kind, ticker, quantity, price, fees, cash) |
+| GET | `/api/accounts/:id/sales` | paged realised sales with totals for the filter: `?method=&year=&q=&sort=&dir=&limit=&offset=` |
 | GET | `/api/accounts/:id/report` | `?method=AVERAGE\|FIFO`: sales, holdings, yearly totals, warnings |
 | GET | `/api/accounts/:id/portfolio` | live value from Trading 212 (cached 20 s), total result since the first deposit and its breakdown, open positions |
 | GET | `/api/accounts/:id/timeline` | `?method=`: monthly totals and, per instrument, every trade with the position and average cost after it |
@@ -43,7 +44,7 @@ npm run dev:web                    # http://localhost:4200, proxies /api to :300
 ## Status
 
 - Sign-in is a temporary single-user stub (`DEV_USER_EMAIL`). Real sign-in is required before any public deployment.
-- Web UI: accounts list + connect form, account page (sync status, tax year, cost method, Trading 212 comparison, Excel/PDF download, sales / movements / holdings).
+- Web UI: accounts list + connect form; per account three pages with a sticky header: Overview (live value, total result and breakdown, positions; collapses to a bar on scroll), For the accountant (period figures, exports, lazy-loaded sortable sales/movements tables), Timeline. Skeletons everywhere while a sync runs.
 - Timeline page: monthly buys/sells chart (with table view) and a per-instrument chart of buys, sells and the average-cost step line (hand-written SVG, no chart library).
 - Verified on a practice account (2026-11-07): `walletImpact.netValue` includes FX fees (BUY: cost + fee, SELL: proceeds - fee). Our realised P&L includes fees; Trading 212's own `realisedProfitLoss` and position cost exclude them, so they differ by exactly the fees.
 - Verified on a real-money account (2026-11-08, 2 years, 709 trades, 24 dividends): positions match Trading 212 to 8 decimals; cost and realised P&L differ only by FX fees; cash reconciles to the cent. Real accounts use INTEREST_ON_FREE_CASH and WITHDRAW; internal tickers can be pre-merger names (NPA_US_EQ is ASTS), so display tickers come from instrument metadata (cached daily).

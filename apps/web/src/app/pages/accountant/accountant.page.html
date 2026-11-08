@@ -1,0 +1,589 @@
+@let acc = state.value();
+@let cur = currency();
+
+<div stickyTop class="-mx-4 border-b border-line bg-canvas/95 px-4 backdrop-blur">
+  <app-account-header [state]="state" [accountId]="id()" active="accountant" />
+
+  <!-- Toolbar: everything on this page follows these choices -->
+  <div class="flex flex-wrap items-end justify-between gap-3 py-3">
+    <div class="flex flex-wrap items-end gap-3">
+      <label class="text-xs">
+        <span class="block font-medium text-muted">Περίοδος</span>
+        <select
+          [value]="year() === null ? 'all' : year()"
+          (change)="selectYear($any($event.target).value)"
+          [disabled]="!years().length"
+          class="mt-1 rounded-lg border border-line bg-surface px-3 py-1.5 text-sm"
+        >
+          @for (y of years(); track y) {
+            <option [value]="y">Φορολογικό έτος {{ y }}</option>
+          }
+          <option value="all">Όλο το ιστορικό</option>
+        </select>
+      </label>
+      <fieldset class="text-xs">
+        <legend class="font-medium text-muted">Μέθοδος κόστους</legend>
+        <div class="mt-1 inline-flex rounded-lg border border-line bg-surface p-0.5">
+          @for (m of ['AVERAGE', 'FIFO']; track m) {
+            <button
+              type="button"
+              (click)="method.set($any(m))"
+              [attr.aria-pressed]="method() === m"
+              class="rounded-md px-3 py-1 text-sm transition"
+              [class]="method() === m ? 'bg-brand text-white' : 'text-muted hover:text-ink'"
+            >
+              {{ m === 'AVERAGE' ? 'Μέση τιμή' : 'FIFO' }}
+            </button>
+          }
+        </div>
+      </fieldset>
+    </div>
+    <div class="flex gap-2">
+      <a
+        [href]="exportHref('xlsx')"
+        download
+        [class.pointer-events-none]="cardsLoading()"
+        [class.opacity-50]="cardsLoading()"
+        class="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white transition hover:bg-brand-strong"
+      >
+        ↓ Excel
+      </a>
+      <a
+        [href]="exportHref('pdf')"
+        download
+        [class.pointer-events-none]="cardsLoading()"
+        [class.opacity-50]="cardsLoading()"
+        class="rounded-lg border border-brand px-4 py-2 text-sm font-medium text-brand transition hover:bg-brand/5"
+      >
+        ↓ PDF
+      </a>
+    </div>
+  </div>
+</div>
+
+@if (acc && state.syncing()) {
+  <app-sync-progress
+    class="mt-6 block"
+    [account]="acc"
+    [now]="state.now()"
+    [variant]="acc.lastSyncedAt ? 'compact' : 'full'"
+  />
+}
+
+<!-- Period figures -->
+<div class="mt-6 grid gap-3 lg:grid-cols-[1.2fr_2fr]">
+  <section class="rounded-xl border border-line bg-surface p-5">
+    @if (cardsLoading() || !summary()) {
+      <div aria-hidden="true">
+        <div class="h-3 w-56 animate-pulse rounded bg-line"></div>
+        <div class="mt-3 h-8 w-40 animate-pulse rounded bg-line"></div>
+        <div class="mt-3 h-3 w-64 animate-pulse rounded bg-line/70"></div>
+        <div class="mt-5 h-16 animate-pulse rounded-lg bg-line/50"></div>
+      </div>
+    } @else {
+      @let s = summary()!;
+      <p class="text-sm text-muted">
+        Αποτέλεσμα πωλήσεων · <span class="font-medium text-ink">{{ periodLabel() }}</span>
+      </p>
+      <p
+        class="mt-1 text-3xl font-semibold tracking-tight"
+        [class.text-gain]="Number(s.realisedPnl) > 0"
+        [class.text-loss]="Number(s.realisedPnl) < 0"
+      >
+        {{ money(s.realisedPnl, cur) }}
+      </p>
+      <p class="mt-1 text-xs text-muted">
+        Μόνο όσα πούλησες μέσα στην περίοδο, με τις χρεώσεις. Δεν περιλαμβάνει όσα κρατάς ακόμα.
+      </p>
+      @if (brokerComparison(); as c) {
+        @if (Number(c.difference) !== 0) {
+          <div class="mt-4 rounded-lg bg-amber-50 p-3 text-xs leading-relaxed text-amber-900">
+            Το Trading 212 δείχνει <strong>{{ money(c.broker, cur) }}</strong
+            >. Η διαφορά των <strong>{{ money(c.difference, cur) }}</strong> είναι χρεώσεις (κυρίως
+            μετατροπής νομίσματος) που το Trading 212 δεν αφαιρεί από το αποτέλεσμα.
+          </div>
+        }
+      }
+    }
+  </section>
+
+  <div class="flex flex-col gap-3">
+    <dl class="grid grid-cols-2 gap-3 sm:grid-cols-3">
+      @for (t of tiles; track t.field) {
+        <div class="rounded-xl border border-line bg-surface p-4">
+          <dt class="text-xs text-muted">
+            {{ t.label }}
+            @if (t.hint) {
+              <span class="block text-[11px] opacity-80">{{ t.hint }}</span>
+            }
+          </dt>
+          @if (cardsLoading() || !summary()) {
+            <dd class="mt-2 h-4 w-24 animate-pulse rounded bg-line" aria-hidden="true"></dd>
+          } @else {
+            <dd class="mt-1 font-semibold">{{ money(summary()![t.field], cur) }}</dd>
+            @if (t.field === 'dividends' && dividendTax(); as dt) {
+              <p class="mt-1 text-[11px] leading-snug text-muted">
+                μικτά ~{{ money(dt.gross, cur) }} · φόρος εξωτ. ~{{ money(dt.withheld, cur) }}
+              </p>
+            }
+          }
+        </div>
+      }
+    </dl>
+    <div class="rounded-xl border border-dashed border-line bg-surface/60 p-4 text-sm">
+      @if (cardsLoading() || !summary()) {
+        <div class="h-3 w-80 max-w-full animate-pulse rounded bg-line" aria-hidden="true"></div>
+        <div class="mt-3 h-3 w-full animate-pulse rounded bg-line/60" aria-hidden="true"></div>
+      } @else {
+        <p class="flex flex-wrap gap-x-6 gap-y-1">
+          <span class="font-medium">Τζίρος περιόδου</span>
+          <span>Αγορές {{ money(summary()!.purchases, cur) }}</span>
+          <span>Πωλήσεις {{ money(summary()!.saleProceeds, cur) }}</span>
+        </p>
+        <p class="mt-1 text-xs leading-relaxed text-muted">
+          Το σύνολο όλων των αγορών και πωλήσεων, με χρεώσεις. Δεν είναι χρήματα που έβαλες ή πήρες:
+          κάθε φορά που πουλάς και ξαναγοράζεις, τα ίδια χρήματα μετρούν ξανά. Χρειάζεται στον
+          λογιστή για τη δήλωση (π.χ. δαπάνη απόκτησης μετοχών).
+        </p>
+      }
+    </div>
+  </div>
+</div>
+
+@if (!cardsLoading() && warnings().length) {
+  <div class="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+    <p class="font-medium">{{ warnings().length }} εγγραφές χρειάζονται έλεγχο</p>
+    <ul class="mt-1 list-disc pl-5 text-xs">
+      @for (w of warnings(); track w.entryId) {
+        <li>{{ date(w.date) }} · {{ w.message }}</li>
+      }
+    </ul>
+  </div>
+}
+
+<!-- Tables -->
+<section class="mt-8 rounded-xl border border-line bg-surface">
+  <div class="flex flex-wrap items-center justify-between gap-3 border-b border-line px-3 pt-2">
+    <div role="tablist" class="flex gap-1">
+      @for (t of tabs; track t.id) {
+        <button
+          type="button"
+          role="tab"
+          [attr.aria-selected]="tab() === t.id"
+          (click)="tab.set(t.id)"
+          class="-mb-px border-b-2 px-3 py-2 text-sm font-medium transition"
+          [class]="
+            tab() === t.id
+              ? 'border-brand text-ink'
+              : 'border-transparent text-muted hover:text-ink'
+          "
+        >
+          {{ t.label() }}
+        </button>
+      }
+    </div>
+    <div class="flex flex-wrap gap-2 pb-2">
+      @if (tab() === 'entries') {
+        <select
+          [value]="kindFilter()"
+          (change)="kindFilter.set($any($event.target).value)"
+          aria-label="Είδος κίνησης"
+          class="rounded-lg border border-line bg-surface px-3 py-1.5 text-sm"
+        >
+          <option value="">Όλα τα είδη</option>
+          @for (k of kinds; track k[0]) {
+            <option [value]="k[0]">{{ k[1] }}</option>
+          }
+        </select>
+      }
+      <input
+        type="search"
+        [value]="search()"
+        (input)="search.set($any($event.target).value)"
+        placeholder="Αναζήτηση τίτλου ή ISIN"
+        aria-label="Αναζήτηση τίτλου ή ISIN"
+        class="w-56 rounded-lg border border-line px-3 py-1.5 text-sm"
+      />
+    </div>
+  </div>
+
+  <div class="overflow-x-auto lg:overflow-visible">
+    @switch (tab()) {
+      @case ('sales') {
+        @let list = sales;
+        <table class="w-full min-w-[820px] text-sm">
+          <thead
+            class="sticky-head bg-canvas text-left text-xs text-muted shadow-[0_1px_0_var(--color-line)]"
+          >
+            <tr>
+              <th
+                class="px-4 py-2"
+                sortKey="date"
+                [sort]="salesSort()"
+                [dir]="salesDir()"
+                (sorted)="sortSales($event)"
+              >
+                Ημερομηνία
+              </th>
+              <th
+                class="px-4 py-2"
+                sortKey="ticker"
+                firstDir="asc"
+                [sort]="salesSort()"
+                [dir]="salesDir()"
+                (sorted)="sortSales($event)"
+              >
+                Τίτλος
+              </th>
+              <th
+                class="px-4 py-2"
+                sortKey="quantity"
+                align="right"
+                [sort]="salesSort()"
+                [dir]="salesDir()"
+                (sorted)="sortSales($event)"
+              >
+                Ποσότητα
+              </th>
+              <th
+                class="px-4 py-2"
+                sortKey="proceeds"
+                align="right"
+                [sort]="salesSort()"
+                [dir]="salesDir()"
+                (sorted)="sortSales($event)"
+              >
+                Έσοδο
+              </th>
+              <th
+                class="px-4 py-2"
+                sortKey="costBasis"
+                align="right"
+                [sort]="salesSort()"
+                [dir]="salesDir()"
+                (sorted)="sortSales($event)"
+              >
+                Κόστος
+              </th>
+              <th
+                class="px-4 py-2"
+                sortKey="realisedPnl"
+                align="right"
+                [sort]="salesSort()"
+                [dir]="salesDir()"
+                (sorted)="sortSales($event)"
+              >
+                Αποτέλεσμα
+              </th>
+              <th
+                class="px-4 py-2"
+                sortKey="brokerRealisedPnl"
+                align="right"
+                [sort]="salesSort()"
+                [dir]="salesDir()"
+                (sorted)="sortSales($event)"
+              >
+                Κατά T212
+              </th>
+            </tr>
+          </thead>
+          @if (state.syncing() || list.initialLoading() || !report.hasValue()) {
+            <tbody skeletonRows [rows]="8" [cols]="7"></tbody>
+          } @else {
+            <tbody class="divide-y divide-line">
+              @for (s of list.items(); track s.entryId) {
+                <tr class="hover:bg-canvas/60">
+                  <td class="whitespace-nowrap px-4 py-2 text-muted">{{ date(s.date) }}</td>
+                  <td class="px-4 py-2">
+                    <span class="font-medium">{{ ticker(s.ticker) }}</span>
+                    <span class="ml-1 text-muted">{{ s.instrumentName }}</span>
+                  </td>
+                  <td class="whitespace-nowrap px-4 py-2 text-right">{{ qty(s.quantity) }}</td>
+                  <td class="whitespace-nowrap px-4 py-2 text-right">
+                    {{ money(s.proceeds, cur) }}
+                  </td>
+                  <td class="whitespace-nowrap px-4 py-2 text-right">
+                    {{ money(s.costBasis, cur) }}
+                  </td>
+                  <td
+                    class="whitespace-nowrap px-4 py-2 text-right font-medium"
+                    [class.text-gain]="Number(s.realisedPnl) > 0"
+                    [class.text-loss]="Number(s.realisedPnl) < 0"
+                  >
+                    {{ money(s.realisedPnl, cur) }}
+                  </td>
+                  <td class="whitespace-nowrap px-4 py-2 text-right text-muted">
+                    {{ money(s.brokerRealisedPnl, cur) }}
+                  </td>
+                </tr>
+              } @empty {
+                @if (!list.error()) {
+                  <tr>
+                    <td colspan="7" class="px-4 py-8 text-center text-muted">
+                      Καμία πώληση με αυτά τα φίλτρα.
+                    </td>
+                  </tr>
+                }
+              }
+            </tbody>
+            @if (list.loading()) {
+              <tbody skeletonRows [rows]="3" [cols]="7"></tbody>
+            }
+            @if (list.last()?.totals; as t) {
+              @if (list.items().length) {
+                <tfoot class="border-t border-line bg-canvas/60 font-medium">
+                  <tr>
+                    <td class="px-4 py-2.5" colspan="3">Σύνολο ({{ list.total() }} πωλήσεις)</td>
+                    <td class="whitespace-nowrap px-4 py-2.5 text-right">
+                      {{ money(t.proceeds, cur) }}
+                    </td>
+                    <td class="whitespace-nowrap px-4 py-2.5 text-right">
+                      {{ money(t.costBasis, cur) }}
+                    </td>
+                    <td
+                      class="whitespace-nowrap px-4 py-2.5 text-right"
+                      [class.text-gain]="Number(t.realisedPnl) > 0"
+                      [class.text-loss]="Number(t.realisedPnl) < 0"
+                    >
+                      {{ money(t.realisedPnl, cur) }}
+                    </td>
+                    <td class="whitespace-nowrap px-4 py-2.5 text-right text-muted">
+                      {{ money(t.brokerRealisedPnl, cur) }}
+                    </td>
+                  </tr>
+                </tfoot>
+              }
+            }
+          }
+        </table>
+        <ng-container *ngTemplateOutlet="pager; context: { $implicit: list }" />
+      }
+
+      @case ('entries') {
+        @let list = entries;
+        <table class="w-full min-w-[820px] text-sm">
+          <thead
+            class="sticky-head bg-canvas text-left text-xs text-muted shadow-[0_1px_0_var(--color-line)]"
+          >
+            <tr>
+              <th
+                class="px-4 py-2"
+                sortKey="date"
+                [sort]="entriesSort()"
+                [dir]="entriesDir()"
+                (sorted)="sortEntries($event)"
+              >
+                Ημερομηνία
+              </th>
+              <th
+                class="px-4 py-2"
+                sortKey="kind"
+                firstDir="asc"
+                [sort]="entriesSort()"
+                [dir]="entriesDir()"
+                (sorted)="sortEntries($event)"
+              >
+                Είδος
+              </th>
+              <th
+                class="px-4 py-2"
+                sortKey="ticker"
+                firstDir="asc"
+                [sort]="entriesSort()"
+                [dir]="entriesDir()"
+                (sorted)="sortEntries($event)"
+              >
+                Τίτλος
+              </th>
+              <th
+                class="px-4 py-2"
+                sortKey="quantity"
+                align="right"
+                [sort]="entriesSort()"
+                [dir]="entriesDir()"
+                (sorted)="sortEntries($event)"
+              >
+                Ποσότητα
+              </th>
+              <th
+                class="px-4 py-2"
+                sortKey="price"
+                align="right"
+                [sort]="entriesSort()"
+                [dir]="entriesDir()"
+                (sorted)="sortEntries($event)"
+              >
+                Τιμή
+              </th>
+              <th
+                class="px-4 py-2"
+                sortKey="fees"
+                align="right"
+                [sort]="entriesSort()"
+                [dir]="entriesDir()"
+                (sorted)="sortEntries($event)"
+              >
+                Χρεώσεις
+              </th>
+              <th
+                class="px-4 py-2"
+                sortKey="cash"
+                align="right"
+                [sort]="entriesSort()"
+                [dir]="entriesDir()"
+                (sorted)="sortEntries($event)"
+              >
+                Μετρητά
+              </th>
+            </tr>
+          </thead>
+          @if (state.syncing() || list.initialLoading() || !report.hasValue()) {
+            <tbody skeletonRows [rows]="8" [cols]="7"></tbody>
+          } @else {
+            <tbody class="divide-y divide-line">
+              @for (e of list.items(); track e.id) {
+                <tr class="hover:bg-canvas/60">
+                  <td class="whitespace-nowrap px-4 py-2 text-muted">
+                    {{ dateTime(e.occurredAt) }}
+                  </td>
+                  <td class="whitespace-nowrap px-4 py-2">{{ kindLabel[e.kind] }}</td>
+                  <td class="px-4 py-2">
+                    @if (e.ticker) {
+                      <span class="font-medium">{{ ticker(e.displayTicker ?? e.ticker) }}</span>
+                      <span class="ml-1 text-muted">{{ e.instrumentName }}</span>
+                    }
+                  </td>
+                  <td class="whitespace-nowrap px-4 py-2 text-right">{{ qty(e.quantity) }}</td>
+                  <td class="whitespace-nowrap px-4 py-2 text-right text-muted">
+                    @if (e.price) {
+                      {{ qty(e.price) }} {{ e.instrumentCurrency }}
+                    }
+                  </td>
+                  <td class="whitespace-nowrap px-4 py-2 text-right text-muted">
+                    {{ Number(e.fees) ? money(e.fees, cur) : '' }}
+                  </td>
+                  <td
+                    class="whitespace-nowrap px-4 py-2 text-right font-medium"
+                    [class.text-gain]="Number(e.cashAmount) > 0"
+                    [class.text-loss]="Number(e.cashAmount) < 0"
+                  >
+                    {{ money(e.cashAmount, cur) }}
+                  </td>
+                </tr>
+              } @empty {
+                @if (!list.error()) {
+                  <tr>
+                    <td colspan="7" class="px-4 py-8 text-center text-muted">
+                      Καμία κίνηση με αυτά τα φίλτρα.
+                    </td>
+                  </tr>
+                }
+              }
+            </tbody>
+            @if (list.loading()) {
+              <tbody skeletonRows [rows]="3" [cols]="7"></tbody>
+            }
+          }
+        </table>
+        <ng-container *ngTemplateOutlet="pager; context: { $implicit: list }" />
+      }
+
+      @case ('holdings') {
+        <table class="w-full min-w-[640px] text-sm">
+          <thead
+            class="sticky-head bg-canvas text-left text-xs text-muted shadow-[0_1px_0_var(--color-line)]"
+          >
+            <tr>
+              <th
+                class="px-4 py-2"
+                sortKey="ticker"
+                firstDir="asc"
+                [sort]="holdingsSort()"
+                [dir]="holdingsDir()"
+                (sorted)="sortHoldings($event)"
+              >
+                Τίτλος
+              </th>
+              <th class="px-4 py-2 font-medium">ISIN</th>
+              <th
+                class="px-4 py-2"
+                sortKey="quantity"
+                align="right"
+                [sort]="holdingsSort()"
+                [dir]="holdingsDir()"
+                (sorted)="sortHoldings($event)"
+              >
+                Ποσότητα
+              </th>
+              <th
+                class="px-4 py-2"
+                sortKey="averageCost"
+                align="right"
+                [sort]="holdingsSort()"
+                [dir]="holdingsDir()"
+                (sorted)="sortHoldings($event)"
+              >
+                Μέση τιμή
+              </th>
+              <th
+                class="px-4 py-2"
+                sortKey="costBasis"
+                align="right"
+                [sort]="holdingsSort()"
+                [dir]="holdingsDir()"
+                (sorted)="sortHoldings($event)"
+              >
+                Κόστος κτήσης
+              </th>
+            </tr>
+          </thead>
+          @if (cardsLoading()) {
+            <tbody skeletonRows [rows]="5" [cols]="5"></tbody>
+          } @else {
+            <tbody class="divide-y divide-line">
+              @for (h of holdings(); track h.isin ?? h.ticker) {
+                <tr class="hover:bg-canvas/60">
+                  <td class="px-4 py-2">
+                    <span class="font-medium">{{ ticker(h.ticker) }}</span>
+                    <span class="ml-1 text-muted">{{ h.instrumentName }}</span>
+                  </td>
+                  <td class="px-4 py-2 font-mono text-xs text-muted">{{ h.isin }}</td>
+                  <td class="whitespace-nowrap px-4 py-2 text-right">{{ qty(h.quantity) }}</td>
+                  <td class="whitespace-nowrap px-4 py-2 text-right">
+                    {{ money(h.averageCost, cur) }}
+                  </td>
+                  <td class="whitespace-nowrap px-4 py-2 text-right font-medium">
+                    {{ money(h.costBasis, cur) }}
+                  </td>
+                </tr>
+              } @empty {
+                <tr>
+                  <td colspan="5" class="px-4 py-8 text-center text-muted">Καμία ανοιχτή θέση.</td>
+                </tr>
+              }
+            </tbody>
+          }
+        </table>
+      }
+    }
+  </div>
+</section>
+
+<!-- Footer of a paged table: progress, errors, and the trigger for the next page -->
+<ng-template #pager let-list>
+  @if (list.error()) {
+    <p class="border-t border-line px-4 py-3 text-sm text-loss">
+      {{ list.error() }}
+      <button type="button" (click)="list.retry()" class="ml-2 font-medium underline">
+        Δοκίμασε ξανά
+      </button>
+    </p>
+  } @else if (list.total() !== null && !state.syncing()) {
+    <p class="border-t border-line px-4 py-2 text-xs text-muted">
+      Εμφανίζονται {{ list.items().length }} από {{ list.total() }}
+    </p>
+  }
+  @if (list.hasMore() && !list.error()) {
+    <div (nearEnd)="list.loadMore()" class="h-px"></div>
+  }
+</ng-template>

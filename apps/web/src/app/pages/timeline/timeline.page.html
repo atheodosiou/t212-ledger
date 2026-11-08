@@ -1,36 +1,53 @@
 @let cur = currency();
+@let acc = state.value();
 
-<a [routerLink]="['/accounts', id()]" class="text-sm text-muted hover:text-ink">
-  ‹ {{ account.hasValue() ? account.value().label : 'Λογαριασμός' }}
-</a>
-
-<div class="mt-3 flex flex-wrap items-end justify-between gap-4">
-  <div>
-    <h1 class="text-2xl font-semibold tracking-tight">Χρονολόγιο</h1>
-    <p class="mt-1 text-sm text-muted">
+<div stickyTop class="-mx-4 border-b border-line bg-canvas/95 px-4 backdrop-blur">
+  <app-account-header [state]="state" [accountId]="id()" active="timeline" />
+  <div class="flex flex-wrap items-end justify-between gap-3 py-3">
+    <p class="text-sm text-muted">
       Πότε αγόρασες και πούλησες, και πώς άλλαξε η μέση τιμή κτήσης σου.
     </p>
+    <fieldset class="text-xs">
+      <legend class="font-medium text-muted">Μέθοδος κόστους</legend>
+      <div class="mt-1 inline-flex rounded-lg border border-line bg-surface p-0.5">
+        @for (m of ['AVERAGE', 'FIFO']; track m) {
+          <button
+            type="button"
+            (click)="method.set($any(m))"
+            [attr.aria-pressed]="method() === m"
+            class="rounded-md px-3 py-1 text-sm transition"
+            [class]="method() === m ? 'bg-brand text-white' : 'text-muted hover:text-ink'"
+          >
+            {{ m === 'AVERAGE' ? 'Μέση τιμή' : 'FIFO' }}
+          </button>
+        }
+      </div>
+    </fieldset>
   </div>
-  <fieldset class="text-sm">
-    <legend class="font-medium">Μέθοδος κόστους</legend>
-    <div class="mt-1 inline-flex rounded-lg border border-line bg-surface p-0.5">
-      @for (m of ['AVERAGE', 'FIFO']; track m) {
-        <button
-          type="button"
-          (click)="method.set($any(m))"
-          [attr.aria-pressed]="method() === m"
-          class="rounded-md px-3 py-1.5 text-sm transition"
-          [class]="method() === m ? 'bg-brand text-white' : 'text-muted hover:text-ink'"
-        >
-          {{ m === 'AVERAGE' ? 'Μέση τιμή' : 'FIFO' }}
-        </button>
-      }
-    </div>
-  </fieldset>
 </div>
 
-@if (timeline.isLoading() && !timeline.hasValue()) {
-  <div class="mt-8 h-72 animate-pulse rounded-xl bg-line/60"></div>
+@if (acc && state.syncing()) {
+  <app-sync-progress
+    class="mt-6 block"
+    [account]="acc"
+    [now]="state.now()"
+    [variant]="acc.lastSyncedAt ? 'compact' : 'full'"
+  />
+}
+
+@if (state.syncing() || (timeline.isLoading() && !timeline.hasValue())) {
+  <div class="mt-6 space-y-6" aria-hidden="true">
+    @for (i of [1, 2]; track i) {
+      <div class="rounded-xl border border-line bg-surface p-5">
+        <div class="h-4 w-32 animate-pulse rounded bg-line"></div>
+        <div class="mt-4 flex h-56 items-end gap-3">
+          @for (h of [40, 75, 30, 90, 55, 65, 20, 80]; track $index) {
+            <div class="flex-1 animate-pulse rounded-t bg-line/70" [style.height.%]="h"></div>
+          }
+        </div>
+      </div>
+    }
+  </div>
 } @else if (timeline.error()) {
   <p class="mt-8 rounded-xl border border-loss/30 bg-loss/5 p-4 text-sm text-loss">
     Δεν φορτώθηκε το χρονολόγιο.
