@@ -21,13 +21,27 @@ Full investment history for Trading 212 accounts, with accountant-ready exports 
 
 ```bash
 npm install
-npm run db:up                      # Postgres 18 on localhost:5433
+npm run db:up                      # Postgres 18 on 127.0.0.1:5433 + daily backups into ./backups
 cp apps/api/.env.example apps/api/.env   # then fill CREDENTIAL_ENCRYPTION_KEY
 npm run build -w api && npm run db:migrate
 npm run dev:api                    # http://localhost:3000/api
 npm run build:shared
 npm run dev:web                    # http://localhost:4200, proxies /api to :3000
 ```
+
+## Safety
+
+- The API listens on 127.0.0.1 only (`HOST`), and refuses to start on any other address while sign-in is the
+  development stub (`DEV_USER_EMAIL`). The database port is published on 127.0.0.1 only.
+- Syncs survive crashes: jobs send a heartbeat, so a sync whose process died is retried within about a minute and
+  resumes where it stopped. On start-up the API also re-queues any account left marked as syncing with no job.
+- Backups: the `db-backup` service writes a `pg_dump` every 24 h into `./backups` and keeps the newest 14.
+  - `npm run db:backup` takes one now.
+  - `npm run db:restore -- backups/<file>.dump --into=check_db` restores into a separate database to inspect it.
+  - `npm run db:restore -- backups/<file>.dump --replace` replaces the live database (stop the API first).
+- Keep `CREDENTIAL_ENCRYPTION_KEY` somewhere safe outside this machine (e.g. a password manager). Without it the
+  stored Trading 212 keys cannot be decrypted; the history itself stays readable and keys can be entered again.
+- CI (`.github/workflows/ci.yml`): typecheck, lint, tests, both builds, and `npm audit` failing on high/critical.
 
 ## API
 

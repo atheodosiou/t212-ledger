@@ -12,4 +12,4 @@ app.enableCors({ origin: config.get('WEB_ORIGIN', { infer: true }) });
 app.useGlobalPipes(new StandardSchemaValidationPipe());
 app.enableShutdownHooks();
 
-await app.listen(config.get('PORT', { infer: true }));
+await app.listen(config.get('PORT', { infer: true }), config.get('HOST', { infer: true }));

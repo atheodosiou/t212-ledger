@@ -6,8 +6,48 @@ services:
       POSTGRES_PASSWORD: t212
       POSTGRES_DB: t212_ledger
     ports:
-      - "5433:5432"
+      # Loopback only: the database is not reachable from the network.
+      - "127.0.0.1:5433:5432"
     volumes:
       - pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U t212 -d t212_ledger"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Daily logical backup of the whole database, newest 14 kept, in ./backups.
+  # Restore: npm run db:restore -- backups/<file>.dump
+  db-backup:
+    image: postgres:18
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PGHOST: db
+      PGUSER: t212
+      PGPASSWORD: t212
+      PGDATABASE: t212_ledger
+      KEEP: 14
+      EVERY_SECONDS: 86400
+    volumes:
+      - ./backups:/backups
+    entrypoint:
+      - sh
+      - -c
+      - |
+        set -eu
+        while true; do
+          file="/backups/t212_ledger-$$(date -u +%Y%m%dT%H%M%SZ).dump"
+          if pg_dump --format=custom --file="$$file.tmp" && mv "$$file.tmp" "$$file"; then
+            echo "backup written: $$file"
+          else
+            echo "backup FAILED" >&2
+            rm -f "$$file.tmp"
+          fi
+          ls -1t /backups/*.dump 2>/dev/null | tail -n +$$((KEEP + 1)) | xargs -r rm -f
+          sleep "$$EVERY_SECONDS"
+        done
+
 volumes:
   pgdata:

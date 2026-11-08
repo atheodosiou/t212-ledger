@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 26
+          cache: npm
+
+      - run: npm ci
+      - run: npm run build:shared
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit tests (API)
+        run: npm run test -w api
+
+      - name: Unit tests (web)
+        run: npm run test -w web -- --watch=false
+
+      - name: Build API
+        run: npm run build -w api
+
+      - name: Build web
+        run: npm run build -w web
+
+      - name: Dependency audit (high and critical)
+        run: npm audit --audit-level=high
