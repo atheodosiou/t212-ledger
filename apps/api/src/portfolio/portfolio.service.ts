@@ -1,4 +1,4 @@
-import { BadGatewayException, Injectable } from '@nestjs/common';
+import { BadGatewayException, Injectable, Logger } from '@nestjs/common';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { AccountsService } from '../accounts/accounts.service.js';
 import type { BrokerAccount } from '../db/schema.js';
@@ -15,7 +15,7 @@ import { buildPortfolioView, type PortfolioView } from './portfolio-view.js';
 
 /** Live data is cached briefly: Trading 212 allows about one summary call every 5 seconds. */
 const LIVE_TTL_MS = 20_000;
-const MAX_RATE_LIMIT_WAIT_MS = 6_000;
+const MAX_RATE_LIMIT_WAIT_MS = 8_000;
 
 export interface LiveSnapshot {
   at: Date;
@@ -25,6 +25,7 @@ export interface LiveSnapshot {
 
 @Injectable()
 export class PortfolioService {
+  private readonly logger = new Logger(PortfolioService.name);
   private readonly cache = new Map<string, LiveSnapshot>();
 
   constructor(
@@ -67,21 +68,13 @@ export class PortfolioService {
       return { snapshot: cached, stale: false };
 
     const client = this.accounts.clientFor(account);
-    const fetchLive = async () => {
-      const [summary, positions] = await Promise.all([
-        client.accountSummary(),
-        client.positions(),
-      ]);
-      const snapshot = { at: new Date(), summary, positions };
-      this.cache.set(account.id, snapshot);
-      return { snapshot, stale: false };
-    };
-
-    try {
+    // Each call is retried on its own: the two endpoints have separate rate limits, so
+    // repeating both after one was limited would spend the other's allowance and fail it.
+    // Nothing cached to fall back on: wait out a short rate-limit window once.
+    const call = async <T>(fn: () => Promise<T>): Promise<T> => {
       try {
-        return await fetchLive();
+        return await fn();
       } catch (error) {
-        // Nothing cached to fall back on: wait out a short rate-limit window once.
         const waitMs =
           error instanceof T212RateLimitError
             ? error.resetAt.getTime() - Date.now() + 250
@@ -89,11 +82,31 @@ export class PortfolioService {
         if (cached || waitMs < 0 || waitMs > MAX_RATE_LIMIT_WAIT_MS)
           throw error;
         await sleep(waitMs);
-        return await fetchLive();
+        return fn();
       }
+    };
+
+    try {
+      const [summary, positions] = await Promise.all([
+        call(() => client.accountSummary()),
+        call(() => client.positions()),
+      ]);
+      const snapshot = { at: new Date(), summary, positions };
+      this.cache.set(account.id, snapshot);
+      return { snapshot, stale: false };
     } catch (error) {
       if (cached && error instanceof T212RateLimitError)
         return { snapshot: cached, stale: true };
+      // The cause, for the logs (status and Trading 212's message; never credentials).
+      this.logger.warn(
+        `Live data for account ${account.id} failed: ${
+          error instanceof T212RateLimitError
+            ? `rate limited until ${error.resetAt.toISOString()}`
+            : error instanceof Error
+              ? error.message.slice(0, 200)
+              : String(error)
+        }`,
+      );
       if (
         error instanceof T212ApiError &&
         (error.status === 401 || error.status === 403)

@@ -47,16 +47,6 @@ export const userIdentities = pgTable(
   ],
 );
 
-/** Closed beta: only these addresses can create an account. Managed with `npm run users`. */
-export const invites = pgTable('invites', {
-  /** Lower-cased. */
-  email: text().primaryKey(),
-  createdAt: timestamp('created_at', { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-  acceptedAt: timestamp('accepted_at', { withTimezone: true }),
-});
-
 /**
  * Signed-in browsers. The id is the SHA-256 of the cookie token, never the token.
  * No foreign key on user_id: the session store must accept any user id (its contract

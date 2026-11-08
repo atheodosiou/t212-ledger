@@ -6,8 +6,6 @@ import { Auth } from '../../core/auth';
 import { apiErrorMessage } from '../../core/format';
 
 const ERRORS: Record<string, string> = {
-  'not-invited':
-    'Αυτή η διεύθυνση δεν έχει πρόσκληση ακόμα. Η εφαρμογή είναι σε κλειστή δοκιμή: ζήτα πρόσκληση και δοκίμασε ξανά.',
   'unverified-email': 'Η Google δεν επιβεβαίωσε τη διεύθυνση email αυτού του λογαριασμού.',
   cancelled: 'Η σύνδεση ακυρώθηκε.',
   failed: 'Η σύνδεση δεν ολοκληρώθηκε. Δοκίμασε ξανά.',
@@ -74,8 +72,7 @@ const ERRORS: Record<string, string> = {
       </div>
 
       <p class="mt-6 text-xs text-muted">
-        Κλειστή δοκιμή: συνδέονται μόνο διευθύνσεις με πρόσκληση. Διάβασε τι κρατάμε και γιατί στο
-        <a routerLink="/privacy" class="underline hover:text-ink">απόρρητο</a>.
+        <a routerLink="/privacy" class="underline hover:text-ink">Απόρρητο</a>
       </p>
     </div>
   `,

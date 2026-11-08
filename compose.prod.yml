@@ -52,7 +52,7 @@ services:
       - no-new-privileges:true
     logging: *logging
 
-  # One-off jobs, never started by `up`: migrations, invites, key rotation.
+  # One-off jobs, never started by `up`: migrations, listing users, key rotation.
   migrate:
     profiles: ["tools"]
     image: t212-api:${IMAGE_TAG}

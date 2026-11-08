@@ -21,12 +21,16 @@ export class FakeT212 {
   failAt: number | null = null;
   /** Answers this request number with a rate limit, once. */
   rateLimitAt: number | null = null;
+  /** Like Trading 212's per-endpoint limits: summary and positions each answer once per this window. */
+  liveWindowMs: number | null = null;
+  private readonly lastLive = new Map<string, number>();
 
   client(): T212Client {
     return {
       page: async (path: string) => this.page(path),
       accountSummary: async (): Promise<T212AccountSummary> => {
         this.track('/summary');
+        this.limitLive('/summary');
         return {
           totalValue: this.cash,
           cash: {
@@ -38,6 +42,7 @@ export class FakeT212 {
       },
       positions: async () => {
         this.track('/positions');
+        this.limitLive('/positions');
         return this.positionsNow;
       },
       instruments: async () => {
@@ -64,6 +69,15 @@ export class FakeT212 {
 
   historyRequests(): string[] {
     return this.requests.filter((r) => r.includes('/history/'));
+  }
+
+  private limitLive(endpoint: string): void {
+    if (this.liveWindowMs === null) return;
+    const last = this.lastLive.get(endpoint);
+    if (last !== undefined && Date.now() - last < this.liveWindowMs) {
+      throw new T212RateLimitError(new Date(last + this.liveWindowMs));
+    }
+    this.lastLive.set(endpoint, Date.now());
   }
 
   private track(path: string): void {

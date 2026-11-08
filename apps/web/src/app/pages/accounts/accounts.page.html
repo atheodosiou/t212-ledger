@@ -77,6 +77,19 @@
       <li>Αντέγραψε key και secret εδώ. Αποθηκεύονται κρυπτογραφημένα.</li>
     </ol>
 
+    <div
+      role="note"
+      class="mt-4 flex gap-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900"
+    >
+      <span aria-hidden="true" class="text-sm leading-none">⚠</span>
+      <p>
+        <span class="font-semibold">Προσοχή:</span> το API key δίνει πρόσβαση στον λογαριασμό σου
+        στο Trading 212. Φτιάξε key <span class="font-semibold">μόνο για ανάγνωση</span>: με
+        δικαίωμα orders, όποιος το αποκτήσει μπορεί να κάνει συναλλαγές. Μην το μοιράζεσαι πουθενά
+        αλλού, και ανακάλεσέ το από το Trading 212 όποτε θέλεις.
+      </p>
+    </div>
+
     <form [formRoot]="connectForm" class="mt-5 space-y-4">
       <label class="block">
         <span class="text-sm font-medium">Όνομα</span>

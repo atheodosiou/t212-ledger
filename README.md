@@ -40,14 +40,8 @@ Sign in at http://localhost:4200 with the `DEV_USER_EMAIL` button (development o
   `__Host-sid` cookie, of which only the SHA-256 is stored. 30 days at most, 7 days idle.
 - Every route needs a signed-in user unless marked `@Public()` (health, the sign-in routes). Writes from another
   origin are refused (`app.enableCsrfProtection()`).
-- Closed beta: an address must be invited before its first sign-in. Identities are linked by Google's subject id; an
-  address Google has not verified is refused.
-
-  ```bash
-  npm run users -w api -- invite someone@example.com
-  npm run users -w api -- uninvite someone@example.com
-  npm run users -w api -- list
-  ```
+- Anyone with a Google account can sign up; the first sign-in creates the user. Identities are linked by Google's
+  subject id; an address Google has not verified is refused. `npm run users -w api -- list` lists who has signed up.
 
 - Google Cloud Console → APIs & Services → Credentials → Create OAuth client ID, type *Web application*:
   - Authorized redirect URIs: `https://ledger.theodosiou.me/api/auth/oidc/google/callback`, plus the localhost one
@@ -118,8 +112,8 @@ Browser ── https://ledger.theodosiou.me ──▶ Nginx (Contabo VPS)
      - `VPS_HOST`;
      - `VPS_DEPLOY_KEY`: the private key;
      - `VPS_KNOWN_HOSTS`: what install.sh printed, prefixed with the host.
-  7. Run the workflow, then invite yourself:
-     `docker compose -f compose.prod.yml --env-file .env.production --profile tools run --rm users invite <email>`.
+  7. Run the workflow, then sign in at https://ledger.theodosiou.me. To list users:
+     `docker compose -f compose.prod.yml --env-file .env.production --profile tools run --rm users list`.
 - After changing anything in `deploy/`, run `deploy/install.sh` on the VPS again.
 - Rolling back by hand:
   - API: set `IMAGE_TAG` in `.env.production` to a previous tag, then run `docker compose … up -d api`.
@@ -154,7 +148,7 @@ Browser ── https://ledger.theodosiou.me ──▶ Nginx (Contabo VPS)
 - Integration tests (`npm run test:e2e`): the real app against a real Postgres, in a database of their own
   (`t212_ledger_test`, recreated each run), with a fake Trading 212. They cover first sync, nothing-new syncs,
   appends, resuming an interrupted sync, rate limits, reconciliation, paging/filters, exports, access control,
-  sessions, CSRF, invites, data export and erasure. They also run the auth package's contract suite against the
+  sessions, CSRF, sign-up, live-data rate limits, data export and erasure. They also run the auth package's contract suite against the
   session store.
 - CI (`.github/workflows/ci.yml`):
   - typecheck, lint and tests;
@@ -186,7 +180,7 @@ Browser ── https://ledger.theodosiou.me ──▶ Nginx (Contabo VPS)
 
 ## Status
 
-- Sign-in with Google, invite-only (closed beta). Not yet tried with a real Google client, and not yet deployed.
+- Sign-in with Google, open to anyone. Tried locally with a real Google client (2026-11-08); not yet deployed.
 - Web UI: accounts list + connect form; per account three pages with a sticky header: Overview (live value, total result and breakdown, positions; collapses to a bar on scroll), For the accountant (period figures, exports, lazy-loaded sortable sales/movements tables), Timeline. Skeletons everywhere while a sync runs.
 - Timeline page: monthly buys/sells chart (with table view) and a per-instrument chart of buys, sells and the average-cost step line (hand-written SVG, no chart library).
 - Verified on a practice account (2026-11-07): `walletImpact.netValue` includes FX fees (BUY: cost + fee, SELL: proceeds - fee). Our realised P&L includes fees; Trading 212's own `realisedProfitLoss` and position cost exclude them, so they differ by exactly the fees.

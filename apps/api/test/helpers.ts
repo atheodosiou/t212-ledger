@@ -39,7 +39,7 @@ export async function createTestApp(): Promise<TestApp> {
 /** Empties every table, so each test starts from nothing. */
 export async function resetDb(db: Db): Promise<void> {
   await db.execute(
-    sql`truncate users, sessions, oidc_logins, invites, instruments, app_state restart identity cascade`,
+    sql`truncate users, sessions, oidc_logins, instruments, app_state restart identity cascade`,
   );
 }
 

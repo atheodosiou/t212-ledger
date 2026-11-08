@@ -154,4 +154,24 @@ describe('HTTP API', () => {
       .expect(200);
     expect((xlsx.body as Buffer).subarray(0, 2).toString()).toBe('PK'); // a zip, as .xlsx files are
   });
+
+  it('waits out a rate limit on one live endpoint without spending the other', async () => {
+    // Each endpoint answers once per window, and the summary is limited on the first
+    // call (another client used it a moment ago). Repeating both calls would hit the
+    // positions limit; only the limited call may be repeated.
+    const fake = new FakeT212();
+    fake.transactions = [cash('DEPOSIT', 100, '2026-01-01T10:00:00Z')];
+    fake.cash = 100;
+    // No sync: its reconciliation would leave a cached snapshot behind.
+    const account = await seedAccount(t, fake);
+    fake.liveWindowMs = 1_000;
+    fake.rateLimitAt = 1;
+
+    const res = await http()
+      .get(`/api/accounts/${account.id}/portfolio`)
+      .expect(200);
+    expect(res.body).toMatchObject({ stale: false });
+    expect(fake.requests.filter((r) => r === '/positions')).toHaveLength(1);
+    expect(fake.requests.filter((r) => r === '/summary')).toHaveLength(2);
+  });
 });

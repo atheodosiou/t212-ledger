@@ -1,13 +1,13 @@
 import { ForbiddenException, Injectable, Logger } from '@nestjs/common';
 import type { OidcProfile } from '@nestjs/authentication';
 import { InjectDrizzle } from '@nestjs/drizzle';
-import { and, asc, eq, isNull } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import type { AppUser } from '../auth/auth.types.js';
 import type { Db } from '../db/db.js';
-import { invites, userIdentities, users } from '../db/schema.js';
+import { userIdentities, users } from '../db/schema.js';
 
 /** Why a sign-in was refused; the web app shows a message for each. */
-export type SignInRefusal = 'not-invited' | 'unverified-email';
+export type SignInRefusal = 'unverified-email';
 
 export class SignInRefusedError extends ForbiddenException {
   constructor(readonly reason: SignInRefusal) {
@@ -32,8 +32,8 @@ export class UsersService {
    * 1. a known identity (provider, subject) signs in its user;
    * 2. otherwise, with an address the provider verified, an existing user with that
    *    address gets the identity linked (users only ever come from verified sign-ins);
-   * 3. otherwise an invited address becomes a new user;
-   * 4. anyone else is refused.
+   * 3. otherwise a new user is created.
+   * An address the provider did not verify is refused.
    */
   async resolveIdentity(profile: OidcProfile): Promise<AppUser> {
     return this.db.transaction(async (tx) => {
@@ -59,22 +59,11 @@ export class UsersService {
         .from(users)
         .where(eq(users.email, email));
       if (!user) {
-        const [invite] = await tx
-          .update(invites)
-          .set({ acceptedAt: new Date() })
-          .where(eq(invites.email, email))
-          .returning();
-        if (!invite) {
-          this.logger.log(
-            `Sign-in refused: ${maskEmail(email)} is not invited`,
-          );
-          throw new SignInRefusedError('not-invited');
-        }
         [user] = await tx
           .insert(users)
           .values({ email, name: profile.name ?? null })
           .returning(userColumns);
-        this.logger.log(`New user from invite: ${maskEmail(email)}`);
+        this.logger.log(`New user: ${maskEmail(email)}`);
       }
       await tx.insert(userIdentities).values({
         provider: profile.provider,
@@ -97,30 +86,6 @@ export class UsersService {
       })
       .returning(userColumns);
     return user;
-  }
-
-  async invite(email: string): Promise<void> {
-    await this.db
-      .insert(invites)
-      .values({ email: normalizeEmail(email) })
-      .onConflictDoNothing();
-  }
-
-  async uninvite(email: string): Promise<boolean> {
-    const removed = await this.db
-      .delete(invites)
-      .where(
-        and(
-          eq(invites.email, normalizeEmail(email)),
-          isNull(invites.acceptedAt),
-        ),
-      )
-      .returning();
-    return removed.length > 0;
-  }
-
-  listInvites() {
-    return this.db.select().from(invites).orderBy(asc(invites.createdAt));
   }
 
   private async signedIn(

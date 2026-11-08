@@ -29,7 +29,13 @@ import { UsersService } from './users/users.service.js';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true, validate: validateEnv }),
+    // Only the process environment: scripts pass --env-file explicitly, and tests must never
+    // pick up a developer's .env (real keys).
+    ConfigModule.forRoot({
+      isGlobal: true,
+      ignoreEnvFile: true,
+      validate: validateEnv,
+    }),
     DrizzleModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService<Env, true>) => ({

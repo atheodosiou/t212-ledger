@@ -36,6 +36,13 @@
       "when": 1794167871299,
       "tag": "0004_auth",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1794171268938,
+      "tag": "0005_drop_invites",
+      "breakpoints": true
     }
   ]
 }

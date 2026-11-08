@@ -8,7 +8,6 @@ import request from 'supertest';
 import { DrizzleAuthStore } from '../src/auth/drizzle-auth.store.js';
 import {
   brokerAccounts,
-  invites,
   ledgerEntries,
   rawEvents,
   sessions,
@@ -33,9 +32,9 @@ import {
 const google = (over: Partial<OidcProfile> = {}): OidcProfile => ({
   provider: 'google',
   subject: 'google-sub-1',
-  email: 'Invited@Example.com',
+  email: 'New@Example.com',
   emailVerified: true,
-  name: 'Invited Person',
+  name: 'New Person',
   claims: {},
   ...over,
 });
@@ -124,33 +123,23 @@ describe('Sign-in, sessions and personal data', () => {
     });
   });
 
-  describe('who may sign in (closed beta)', () => {
-    it('refuses an address that was not invited', async () => {
-      const users = t.app.get(UsersService);
-      await expect(users.resolveIdentity(google())).rejects.toMatchObject({
-        reason: 'not-invited',
-      });
+  describe('who may sign in', () => {
+    it('refuses an address the provider did not verify', async () => {
+      await expect(
+        t.app
+          .get(UsersService)
+          .resolveIdentity(google({ emailVerified: false })),
+      ).rejects.toBeInstanceOf(SignInRefusedError);
       expect(await count(t, 'users')).toBe(0);
     });
 
-    it('refuses an address the provider did not verify, even if invited', async () => {
+    it('creates a user on the first sign-in, then recognises the identity by subject', async () => {
       const service = t.app.get(UsersService);
-      await service.invite('invited@example.com');
-      await expect(
-        service.resolveIdentity(google({ emailVerified: false })),
-      ).rejects.toBeInstanceOf(SignInRefusedError);
-    });
-
-    it('turns an invite into a user, then recognises the identity by subject', async () => {
-      const service = t.app.get(UsersService);
-      await service.invite('INVITED@example.com');
       const first = await service.resolveIdentity(google());
       expect(first).toMatchObject({
-        email: 'invited@example.com',
-        name: 'Invited Person',
+        email: 'new@example.com',
+        name: 'New Person',
       });
-      const [invite] = await t.db.select().from(invites);
-      expect(invite.acceptedAt).not.toBeNull();
 
       // Same Google account, new address at Google: still the same user.
       const again = await service.resolveIdentity(
@@ -158,9 +147,6 @@ describe('Sign-in, sessions and personal data', () => {
       );
       expect(again.id).toBe(first.id);
       expect(await count(t, 'users')).toBe(1);
-      expect(
-        await t.app.get(UsersService).uninvite('invited@example.com'),
-      ).toBe(false);
     });
 
     it('links Google to an existing user with the same verified address', async () => {
