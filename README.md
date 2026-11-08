@@ -41,6 +41,11 @@ npm run dev:web                    # http://localhost:4200, proxies /api to :300
   - `npm run db:restore -- backups/<file>.dump --replace` replaces the live database (stop the API first).
 - Keep `CREDENTIAL_ENCRYPTION_KEY` somewhere safe outside this machine (e.g. a password manager). Without it the
   stored Trading 212 keys cannot be decrypted; the history itself stays readable and keys can be entered again.
+- Correctness guard: every stored Trading 212 record is checked against the fields the normalizer uses
+  (`src/ledger/raw-schemas.ts`); a record of unexpected shape is kept but left out of every figure. After a sync that
+  brought new records (or daily), the history is compared with Trading 212: shares per position and cash must match
+  (`src/reconciliation`). The result shows in every account header; mismatches and unreadable records are listed on
+  the overview.
 - CI (`.github/workflows/ci.yml`): typecheck, lint, tests, both builds, and `npm audit` failing on high/critical.
 
 ## API

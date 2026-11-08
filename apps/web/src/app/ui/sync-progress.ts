@@ -19,6 +19,7 @@ const STEPS: Step[] = [
   },
   { stage: 'INSTRUMENTS', label: 'Ονόματα τίτλων' },
   { stage: 'LEDGER', label: 'Υπολογισμός κόστους και αποτελεσμάτων' },
+  { stage: 'CHECK', label: 'Έλεγχος συμφωνίας με το Trading 212' },
 ];
 
 /**

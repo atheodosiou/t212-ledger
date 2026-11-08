@@ -12,7 +12,7 @@ import { buildPortfolioView, type PortfolioView } from './portfolio-view.js';
 const LIVE_TTL_MS = 20_000;
 const MAX_RATE_LIMIT_WAIT_MS = 6_000;
 
-interface LiveSnapshot {
+export interface LiveSnapshot {
   at: Date;
   summary: T212AccountSummary;
   positions: T212Position[];
@@ -45,10 +45,13 @@ export class PortfolioService {
     return { ...view, stale };
   }
 
-  /** Fresh data when possible; the last good snapshot if Trading 212 is rate limiting us. */
-  private async live(account: BrokerAccount): Promise<{ snapshot: LiveSnapshot; stale: boolean }> {
+  /**
+   * Fresh data when possible; the last good snapshot if Trading 212 is rate limiting us.
+   * `fresh` skips the cache, e.g. right after a sync when positions may have changed.
+   */
+  async live(account: BrokerAccount, fresh = false): Promise<{ snapshot: LiveSnapshot; stale: boolean }> {
     const cached = this.cache.get(account.id);
-    if (cached && Date.now() - cached.at.getTime() < LIVE_TTL_MS) return { snapshot: cached, stale: false };
+    if (!fresh && cached && Date.now() - cached.at.getTime() < LIVE_TTL_MS) return { snapshot: cached, stale: false };
 
     const client = this.accounts.clientFor(account);
     const fetchLive = async () => {

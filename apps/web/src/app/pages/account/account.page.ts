@@ -16,6 +16,7 @@ import { accountState } from '../../core/account-state';
 import { apiErrorMessage } from '../../core/format';
 import { whileActive } from '../../core/poll';
 import { AccountHeader } from '../../ui/account-header';
+import { ReconciliationPanel } from '../../ui/reconciliation';
 import { SyncProgress } from '../../ui/sync-progress';
 import { StickyTop } from '../../ui/table';
 import { PortfolioSummary } from './portfolio-summary';
@@ -27,7 +28,15 @@ const LIVE_REFRESH_MS = 60_000;
 /** Overview: what the account is worth now, the total result and its breakdown, open positions. */
 @Component({
   selector: 'app-account-page',
-  imports: [AccountHeader, StickyTop, SyncProgress, PortfolioSummary, SummaryBar, PositionsTable],
+  imports: [
+    AccountHeader,
+    StickyTop,
+    SyncProgress,
+    PortfolioSummary,
+    SummaryBar,
+    PositionsTable,
+    ReconciliationPanel,
+  ],
   templateUrl: './account.page.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })

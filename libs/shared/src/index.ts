@@ -17,7 +17,15 @@ export type LedgerKind =
   | 'CORPORATE_ACTION'
   | 'OTHER';
 
-export type SyncStage = 'ORDERS' | 'DIVIDENDS' | 'TRANSACTIONS' | 'INSTRUMENTS' | 'LEDGER';
+export type SyncStage = 'ORDERS' | 'DIVIDENDS' | 'TRANSACTIONS' | 'INSTRUMENTS' | 'LEDGER' | 'CHECK';
+
+export interface ReconciliationDto {
+  checkedAt: string;
+  ok: boolean;
+  issues: { kind: 'position' | 'cash' | 'unreadable' | 'unmapped' | 'history'; severity: 'error' | 'warning'; message: string }[];
+  compared: { positions: number; cashLedger: string; cashBroker: string };
+  stale?: boolean;
+}
 
 export interface SyncProgressDto {
   orders: number;
@@ -37,6 +45,7 @@ export interface AccountDto {
   syncProgress: SyncProgressDto | null;
   syncError: string | null;
   lastSyncedAt: string | null;
+  reconciliation: ReconciliationDto | null;
   createdAt: string;
 }
 

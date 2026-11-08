@@ -21,6 +21,10 @@
     />
   }
 
+  @if (!state.syncing()) {
+    <app-reconciliation-panel class="mt-6" [check]="acc?.reconciliation ?? null" />
+  }
+
   @if (portfolioError(); as message) {
     <div class="mt-6 rounded-xl border border-loss/30 bg-loss/5 p-4 text-sm text-loss">
       {{ message }}

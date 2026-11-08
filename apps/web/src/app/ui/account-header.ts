@@ -3,13 +3,14 @@ import { RouterLink } from '@angular/router';
 import type { AccountState } from '../core/account-state';
 import { Api } from '../core/api';
 import { apiErrorMessage, dateTime, SYNC_LABEL } from '../core/format';
+import { ReconciliationStatus } from './reconciliation';
 
 export type AccountSection = 'overview' | 'accountant' | 'timeline';
 
 /** Account title, sync status, section navigation and the sync button. Lives in the sticky top of every account page. */
 @Component({
   selector: 'app-account-header',
-  imports: [RouterLink],
+  imports: [RouterLink, ReconciliationStatus],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'block' },
   template: `
@@ -40,6 +41,7 @@ export type AccountSection = 'overview' | 'accountant' | 'timeline';
             <span class="text-loss">Ο συγχρονισμός απέτυχε: {{ acc?.syncError }}</span>
           } @else if (acc?.lastSyncedAt) {
             Ενημερώθηκε {{ dateTime(acc!.lastSyncedAt!) }}
+            <app-reconciliation-status [check]="acc!.reconciliation" [accountId]="accountId()" />
           }
         </p>
       </div>

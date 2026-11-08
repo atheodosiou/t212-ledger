@@ -23,6 +23,8 @@ import {
 import { InstrumentsService } from '../trading212/instruments.service.js';
 import { HISTORY_PATHS } from '../trading212/t212.client.js';
 import { T212RateLimitError } from '../trading212/t212.types.js';
+import { needsCheck } from '../reconciliation/reconcile.js';
+import { ReconciliationService } from '../reconciliation/reconciliation.service.js';
 import { walkStream } from './stream-walker.js';
 
 const STAGE_OF: Record<RawSource, SyncStage> = {
@@ -54,6 +56,7 @@ export class HistorySyncService {
     private readonly accounts: AccountsService,
     private readonly ledger: LedgerService,
     private readonly instruments: InstrumentsService,
+    private readonly reconciliation: ReconciliationService,
   ) {}
 
   /**
@@ -130,8 +133,15 @@ export class HistorySyncService {
         ledgerNote = `${added} entries added, ${renamed} renamed`;
       }
 
+      let checkNote = 'check skipped (nothing new)';
+      if (needsCheck(account.reconciliation, newRawIds.length, new Date())) {
+        await enter('CHECK');
+        const check = await this.reconciliation.run(account);
+        checkNote = !check ? 'check could not run' : check.ok ? 'matches Trading 212' : `${check.issues.length} issue(s)`;
+      }
+
       this.logger.log(
-        `Account ${accountId}: ${requests} requests, ${newRawIds.length} new records, ledger ${ledgerNote}`,
+        `Account ${accountId}: ${requests} requests, ${newRawIds.length} new records, ledger ${ledgerNote}, ${checkNote}`,
       );
       await this.setState(accountId, {
         syncStatus: 'IDLE',

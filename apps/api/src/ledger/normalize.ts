@@ -1,5 +1,6 @@
 import { Decimal } from 'decimal.js';
 import type { T212CashTransaction, T212Dividend, T212OrderItem } from '../trading212/t212.types.js';
+import { checkRaw } from './raw-schemas.js';
 
 /**
  * Bump whenever normalization rules change (new type mapping, different amounts...).
@@ -185,7 +186,13 @@ export function normalizeTransaction(item: T212CashTransaction): NormalizedEntry
   };
 }
 
+/**
+ * Returns null for records that never touched the account (cancelled orders) and for
+ * records whose shape is not what we expect: those stay in raw_events and are reported
+ * by the reconciliation instead of being turned into wrong amounts.
+ */
 export function normalizeRaw(source: RawSource, payload: unknown): NormalizedEntry | null {
+  if (checkRaw(source, payload)) return null;
   switch (source) {
     case 'ORDER':
       return normalizeOrder(payload as T212OrderItem);

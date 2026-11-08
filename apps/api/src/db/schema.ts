@@ -10,6 +10,7 @@ import {
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
+import type { Reconciliation } from '../reconciliation/reconcile.js';
 
 /** Money and quantities are stored as NUMERIC and handled as strings / Decimal — never JS floats. */
 const qty = (name: string) => numeric(name, { precision: 28, scale: 10 });
@@ -45,6 +46,8 @@ export const brokerAccounts = pgTable(
     syncState: jsonb('sync_state').$type<SyncStreamsState>(),
     /** Normalizer version the ledger was built with; a mismatch triggers one full rebuild. */
     ledgerVersion: integer('ledger_version'),
+    /** Last comparison of the replayed history with Trading 212 (see reconciliation/reconcile.ts). */
+    reconciliation: jsonb('reconciliation').$type<Reconciliation>(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index('broker_accounts_user_idx').on(t.userId)],
@@ -67,7 +70,7 @@ export const appState = pgTable('app_state', {
 });
 
 /** Steps of a sync, in order. */
-export type SyncStage = 'ORDERS' | 'DIVIDENDS' | 'TRANSACTIONS' | 'INSTRUMENTS' | 'LEDGER';
+export type SyncStage = 'ORDERS' | 'DIVIDENDS' | 'TRANSACTIONS' | 'INSTRUMENTS' | 'LEDGER' | 'CHECK';
 
 export interface SyncProgress {
   orders: number;
