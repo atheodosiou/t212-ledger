@@ -4,8 +4,8 @@ import { RouterLink } from '@angular/router';
 /** Who runs the service and how to reach them. Required before a public launch. */
 export const OPERATOR = {
   name: 'Anastasios Theodosiou',
-  /** TODO(before launch): the address people write to about their data. */
-  contactEmail: '',
+  /** Where people write about their data. */
+  contactEmail: 'anastasios.theodosiou@gmail.com',
 };
 
 @Component({

@@ -63,8 +63,8 @@ Sign in at http://localhost:4200 with the `DEV_USER_EMAIL` button (development o
   - delete the account (`DELETE /api/me`; the user types their address to confirm). This removes the user, accounts
     and keys, history, ledger, identities and sessions at once, and cancels queued syncs. Backups keep a copy for up
     to 14 days.
-- `/privacy` says what is kept and why. Set `OPERATOR.contactEmail` in
-  `apps/web/src/app/pages/privacy/privacy.page.ts` before a public launch.
+- `/privacy` says what is kept and why, and who to write to (`OPERATOR` in
+  `apps/web/src/app/pages/privacy/privacy.page.ts`).
 
 ## Rotating the encryption key
 
