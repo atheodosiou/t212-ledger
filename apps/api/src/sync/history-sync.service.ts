@@ -33,11 +33,12 @@ const STAGE_OF: Record<RawSource, SyncStage> = {
   TRANSACTION: 'TRANSACTIONS',
 };
 
-const PROGRESS_KEY: Record<RawSource, 'orders' | 'dividends' | 'transactions'> = {
-  ORDER: 'orders',
-  DIVIDEND: 'dividends',
-  TRANSACTION: 'transactions',
-};
+const PROGRESS_KEY: Record<RawSource, 'orders' | 'dividends' | 'transactions'> =
+  {
+    ORDER: 'orders',
+    DIVIDEND: 'dividends',
+    TRANSACTION: 'transactions',
+  };
 
 const IDENTITY: Record<RawSource, (item: never) => RawIdentity> = {
   ORDER: orderIdentity,
@@ -67,13 +68,30 @@ export class HistorySyncService {
    * walks the whole history and can resume where it stopped. `full` forgets the
    * walk positions and walks everything again; it is never needed in normal use.
    */
-  async run(accountId: string, full: boolean, signal?: AbortSignal): Promise<void> {
-    const [account] = await this.db.select().from(brokerAccounts).where(eq(brokerAccounts.id, accountId));
+  async run(
+    accountId: string,
+    full: boolean,
+    signal?: AbortSignal,
+  ): Promise<void> {
+    const [account] = await this.db
+      .select()
+      .from(brokerAccounts)
+      .where(eq(brokerAccounts.id, accountId));
     if (!account) return;
 
     const client = this.accounts.clientFor(account);
-    const progress: SyncProgress = { orders: 0, dividends: 0, transactions: 0, stage: 'ORDERS', waitingUntil: null };
-    await this.setState(accountId, { syncStatus: 'RUNNING', syncError: null, syncProgress: progress });
+    const progress: SyncProgress = {
+      orders: 0,
+      dividends: 0,
+      transactions: 0,
+      stage: 'ORDERS',
+      waitingUntil: null,
+    };
+    await this.setState(accountId, {
+      syncStatus: 'RUNNING',
+      syncError: null,
+      syncProgress: progress,
+    });
     const enter = (stage: SyncStage) => {
       progress.stage = stage;
       return this.setState(accountId, { syncProgress: { ...progress } });
@@ -90,7 +108,13 @@ export class HistorySyncService {
         const result = await walkStream({
           basePath: HISTORY_PATHS[source],
           state: streams[source] ?? { backfillDone: false, resume: null },
-          fetchPage: (path) => this.withRateLimit(accountId, progress, () => client.page(path), signal),
+          fetchPage: (path) =>
+            this.withRateLimit(
+              accountId,
+              progress,
+              () => client.page(path),
+              signal,
+            ),
           store: async (items) => {
             const stored = await this.storeRaw(accountId, source, items);
             newRawIds.push(...stored.ids);
@@ -118,7 +142,9 @@ export class HistorySyncService {
         );
       } catch (error) {
         // Display tickers are a nicety: keep the last known names rather than fail the sync.
-        this.logger.warn(`Instrument metadata not refreshed: ${error instanceof Error ? error.message : String(error)}`);
+        this.logger.warn(
+          `Instrument metadata not refreshed: ${error instanceof Error ? error.message : String(error)}`,
+        );
       }
 
       await enter('LEDGER');
@@ -129,7 +155,9 @@ export class HistorySyncService {
         ledgerNote = `rebuilt with rules v${LEDGER_VERSION} (${entries} entries)`;
       } else {
         const added = await this.ledger.append(accountId, newRawIds);
-        const renamed = namesChanged ? await this.ledger.refreshDisplayTickers(accountId) : 0;
+        const renamed = namesChanged
+          ? await this.ledger.refreshDisplayTickers(accountId)
+          : 0;
         ledgerNote = `${added} entries added, ${renamed} renamed`;
       }
 
@@ -137,7 +165,11 @@ export class HistorySyncService {
       if (needsCheck(account.reconciliation, newRawIds.length, new Date())) {
         await enter('CHECK');
         const check = await this.reconciliation.run(account);
-        checkNote = !check ? 'check could not run' : check.ok ? 'matches Trading 212' : `${check.issues.length} issue(s)`;
+        checkNote = !check
+          ? 'check could not run'
+          : check.ok
+            ? 'matches Trading 212'
+            : `${check.issues.length} issue(s)`;
       }
 
       this.logger.log(
@@ -151,7 +183,10 @@ export class HistorySyncService {
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       this.logger.error(`Account ${accountId}: sync failed: ${message}`);
-      await this.setState(accountId, { syncStatus: 'FAILED', syncError: message });
+      await this.setState(accountId, {
+        syncStatus: 'FAILED',
+        syncError: message,
+      });
       throw error;
     }
   }
@@ -169,11 +204,15 @@ export class HistorySyncService {
     const inserted = await this.db
       .insert(rawEvents)
       .values(rows)
-      .onConflictDoNothing({ target: [rawEvents.accountId, rawEvents.source, rawEvents.externalId] })
+      .onConflictDoNothing({
+        target: [rawEvents.accountId, rawEvents.source, rawEvents.externalId],
+      })
       .returning({ id: rawEvents.id, payload: rawEvents.payload });
     return {
       ids: inserted.map((r) => r.id),
-      tickers: inserted.map((r) => rawTicker(r.payload)).filter((t): t is string => !!t),
+      tickers: inserted
+        .map((r) => rawTicker(r.payload))
+        .filter((t): t is string => !!t),
     };
   }
 
@@ -188,8 +227,15 @@ export class HistorySyncService {
       try {
         return await fn();
       } catch (error) {
-        if (!(error instanceof T212RateLimitError) || attempt >= MAX_RATE_LIMIT_WAITS) throw error;
-        const waitMs = Math.max(1_000, error.resetAt.getTime() - Date.now() + 1_000);
+        if (
+          !(error instanceof T212RateLimitError) ||
+          attempt >= MAX_RATE_LIMIT_WAITS
+        )
+          throw error;
+        const waitMs = Math.max(
+          1_000,
+          error.resetAt.getTime() - Date.now() + 1_000,
+        );
         progress.waitingUntil = new Date(Date.now() + waitMs).toISOString();
         await this.setState(accountId, { syncProgress: { ...progress } });
         await sleep(waitMs, undefined, { signal });
@@ -198,12 +244,21 @@ export class HistorySyncService {
     }
   }
 
-  private async setState(accountId: string, values: Partial<typeof brokerAccounts.$inferInsert>): Promise<void> {
-    await this.db.update(brokerAccounts).set(values).where(eq(brokerAccounts.id, accountId));
+  private async setState(
+    accountId: string,
+    values: Partial<typeof brokerAccounts.$inferInsert>,
+  ): Promise<void> {
+    await this.db
+      .update(brokerAccounts)
+      .set(values)
+      .where(eq(brokerAccounts.id, accountId));
   }
 }
 
 function rawTicker(payload: unknown): string | null {
-  const p = payload as { order?: { instrument?: { ticker?: string }; ticker?: string }; ticker?: string };
+  const p = payload as {
+    order?: { instrument?: { ticker?: string }; ticker?: string };
+    ticker?: string;
+  };
   return p.order?.instrument?.ticker ?? p.order?.ticker ?? p.ticker ?? null;
 }

@@ -8,12 +8,16 @@ function fakeApi(history: string[], failAtRequest?: number) {
   const requests: string[] = [];
   const fetchPage = async (path: string): Promise<WalkPage> => {
     requests.push(path);
-    if (failAtRequest !== undefined && requests.length === failAtRequest) throw new Error('network down');
+    if (failAtRequest !== undefined && requests.length === failAtRequest)
+      throw new Error('network down');
     const url = new URL(path, 'https://x.invalid');
     const start = Number(url.searchParams.get('cursor') ?? 0);
     const limit = Number(url.searchParams.get('limit') ?? 50);
     const items = history.slice(start, start + limit);
-    const next = start + limit < history.length ? `${BASE}?cursor=${start + limit}&limit=${limit}` : null;
+    const next =
+      start + limit < history.length
+        ? `${BASE}?cursor=${start + limit}&limit=${limit}`
+        : null;
     return { items, nextPagePath: next };
   };
   return { fetchPage, requests };
@@ -89,7 +93,11 @@ describe('walkStream', () => {
       saveState: async () => {},
     });
     expect(result.inserted).toBe(70);
-    expect(api.requests).toEqual([`${BASE}?limit=10`, `${BASE}?cursor=10&limit=50`, `${BASE}?cursor=60&limit=50`]);
+    expect(api.requests).toEqual([
+      `${BASE}?limit=10`,
+      `${BASE}?cursor=10&limit=50`,
+      `${BASE}?cursor=60&limit=50`,
+    ]);
     expect(db.size).toBe(170);
   });
 
@@ -107,7 +115,10 @@ describe('walkStream', () => {
       }),
     ).rejects.toThrow('network down');
     expect(db.size).toBe(100);
-    expect(state).toEqual({ backfillDone: false, resume: `${BASE}?cursor=100&limit=50` });
+    expect(state).toEqual({
+      backfillDone: false,
+      resume: `${BASE}?cursor=100&limit=50`,
+    });
 
     const second = fakeApi(history(200));
     const result = await walkStream({
@@ -120,7 +131,11 @@ describe('walkStream', () => {
     expect(db.size).toBe(200);
     expect(state.backfillDone).toBe(true);
     // One small head check, then only the pages that were never stored.
-    expect(second.requests).toEqual([`${BASE}?limit=10`, `${BASE}?cursor=100&limit=50`, `${BASE}?cursor=150&limit=50`]);
+    expect(second.requests).toEqual([
+      `${BASE}?limit=10`,
+      `${BASE}?cursor=100&limit=50`,
+      `${BASE}?cursor=150&limit=50`,
+    ]);
     expect(result.inserted).toBe(100);
   });
 
@@ -132,7 +147,10 @@ describe('walkStream', () => {
       state: { backfillDone: false, resume: null },
       fetchPage: async () => {
         calls++;
-        return { items: [`x${calls}`], nextPagePath: `${BASE}?cursor=same&limit=50` };
+        return {
+          items: [`x${calls}`],
+          nextPagePath: `${BASE}?cursor=same&limit=50`,
+        };
       },
       store: store(db),
       saveState: async () => {},

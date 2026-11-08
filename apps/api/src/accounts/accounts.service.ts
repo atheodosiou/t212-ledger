@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectDrizzle } from '@nestjs/drizzle';
 import { and, desc, eq } from 'drizzle-orm';
 import { EncryptionService } from '../crypto/encryption.service.js';
@@ -11,7 +15,11 @@ import type { CreateAccountDto } from './accounts.schemas.js';
 /** What the API exposes about an account. Credentials never leave the server. */
 export type AccountView = Omit<BrokerAccount, 'apiKeyEnc' | 'apiSecretEnc'>;
 
-export function toView({ apiKeyEnc: _k, apiSecretEnc: _s, ...rest }: BrokerAccount): AccountView {
+export function toView({
+  apiKeyEnc: _k,
+  apiSecretEnc: _s,
+  ...rest
+}: BrokerAccount): AccountView {
   return rest;
 }
 
@@ -27,7 +35,10 @@ export class AccountsService {
     try {
       await new T212Client(dto).accountSummary();
     } catch (error) {
-      if (error instanceof T212ApiError && (error.status === 401 || error.status === 403)) {
+      if (
+        error instanceof T212ApiError &&
+        (error.status === 401 || error.status === 403)
+      ) {
         throw new BadRequestException(
           'Trading 212 rejected this API key. Check the key, the secret and that you picked the right environment (Practice/Live).',
         );
@@ -62,7 +73,12 @@ export class AccountsService {
     const [row] = await this.db
       .select()
       .from(brokerAccounts)
-      .where(and(eq(brokerAccounts.id, accountId), eq(brokerAccounts.userId, userId)));
+      .where(
+        and(
+          eq(brokerAccounts.id, accountId),
+          eq(brokerAccounts.userId, userId),
+        ),
+      );
     if (!row) throw new NotFoundException('Account not found');
     return row;
   }
@@ -70,7 +86,9 @@ export class AccountsService {
   async remove(userId: string, accountId: string): Promise<void> {
     await this.get(userId, accountId);
     // Raw events and ledger entries are removed by ON DELETE CASCADE.
-    await this.db.delete(brokerAccounts).where(eq(brokerAccounts.id, accountId));
+    await this.db
+      .delete(brokerAccounts)
+      .where(eq(brokerAccounts.id, accountId));
   }
 
   clientFor(account: BrokerAccount): T212Client {

@@ -1,8 +1,12 @@
 import { Decimal } from 'decimal.js';
 import type { EngineWarning, Holding } from '../ledger/cost-basis.js';
-import type { T212AccountSummary, T212Position } from '../trading212/t212.types.js';
+import type {
+  T212AccountSummary,
+  T212Position,
+} from '../trading212/t212.types.js';
 
-export type IssueKind = 'position' | 'cash' | 'unreadable' | 'unmapped' | 'history';
+export type IssueKind =
+  'position' | 'cash' | 'unreadable' | 'unmapped' | 'history';
 export type IssueSeverity = 'error' | 'warning';
 
 export interface ReconciliationIssue {
@@ -45,7 +49,9 @@ const CASH_TOLERANCE = new Decimal('0.05');
 
 const qty = new Intl.NumberFormat('el-GR', { maximumFractionDigits: 8 });
 const eur = (v: Decimal.Value) =>
-  new Intl.NumberFormat('el-GR', { style: 'currency', currency: 'EUR' }).format(Number(v));
+  new Intl.NumberFormat('el-GR', { style: 'currency', currency: 'EUR' }).format(
+    Number(v),
+  );
 
 /**
  * Compares the history we replayed with what Trading 212 says right now. If our
@@ -55,7 +61,8 @@ const eur = (v: Decimal.Value) =>
 export function reconcile(input: ReconcileInput): Reconciliation {
   const issues: ReconciliationIssue[] = [];
   const ours = new Map(input.holdings.map((h) => [h.isin ?? h.ticker, h]));
-  const name = (ticker: string) => input.displayTickers.get(ticker) ?? ticker.split('_')[0];
+  const name = (ticker: string) =>
+    input.displayTickers.get(ticker) ?? ticker.split('_')[0];
 
   for (const p of input.positions) {
     const key = p.instrument.isin;
@@ -129,7 +136,11 @@ export function reconcile(input: ReconcileInput): Reconciliation {
 }
 
 /** Whether a sync should run the check: new data, never checked, a failed attempt, or a day old. */
-export function needsCheck(previous: Reconciliation | null, newRecords: number, now: Date): boolean {
+export function needsCheck(
+  previous: Reconciliation | null,
+  newRecords: number,
+  now: Date,
+): boolean {
   if (newRecords > 0 || !previous || previous.stale) return true;
   return now.getTime() - Date.parse(previous.checkedAt) >= 24 * 60 * 60 * 1000;
 }

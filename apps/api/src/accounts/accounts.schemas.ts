@@ -10,5 +10,7 @@ export type CreateAccountDto = z.infer<typeof createAccountSchema>;
 
 export const accountIdSchema = z.uuid();
 
-export const syncRequestSchema = z.object({ full: z.boolean().default(false) }).default({ full: false });
+export const syncRequestSchema = z
+  .object({ full: z.boolean().default(false) })
+  .default({ full: false });
 export type SyncRequestDto = z.infer<typeof syncRequestSchema>;

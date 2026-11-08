@@ -1,12 +1,24 @@
 import type { T212Position } from '../trading212/t212.types.js';
 import { buildPortfolioView } from './portfolio-view.js';
 
-const position = (ticker: string, isin: string, value: number, t212Cost: number, extra: Partial<T212Position> = {}): T212Position => ({
+const position = (
+  ticker: string,
+  isin: string,
+  value: number,
+  t212Cost: number,
+  extra: Partial<T212Position> = {},
+): T212Position => ({
   instrument: { ticker, isin, name: ticker, currency: 'USD' },
   quantity: 10,
   averagePricePaid: 1,
   currentPrice: 6.04,
-  walletImpact: { currency: 'EUR', currentValue: value, totalCost: t212Cost, unrealizedProfitLoss: value - t212Cost, fxImpact: -1.5 },
+  walletImpact: {
+    currency: 'EUR',
+    currentValue: value,
+    totalCost: t212Cost,
+    unrealizedProfitLoss: value - t212Cost,
+    fxImpact: -1.5,
+  },
   ...extra,
 });
 
@@ -24,10 +36,22 @@ describe('buildPortfolioView', () => {
   ];
   // Cash left: 1010 - 10 - 10 + 2.5 + 0.5 - 600 + 550 - 400.60 = 542.40
   const view = buildPortfolioView({
-    summary: { totalValue: 842.4, cash: { availableToTrade: 542.4, reservedForOrders: 0, inPies: 0 } },
+    summary: {
+      totalValue: 842.4,
+      cash: { availableToTrade: 542.4, reservedForOrders: 0, inPies: 0 },
+    },
     positions: [position('NPA_US_EQ', 'US00217D1000', 300, 400)],
     engine: {
-      holdings: [{ ticker: 'ASTS', isin: 'US00217D1000', instrumentName: 'AST', quantity: '10', costBasis: '400.60', averageCost: '40.06' }],
+      holdings: [
+        {
+          ticker: 'ASTS',
+          isin: 'US00217D1000',
+          instrumentName: 'AST',
+          quantity: '10',
+          costBasis: '400.60',
+          averageCost: '40.06',
+        },
+      ],
       sales: [{ realisedPnl: '-50.00' } as never],
     },
     entries,
@@ -37,7 +61,13 @@ describe('buildPortfolioView', () => {
   });
 
   it('measures the total result against what was put in', () => {
-    expect(view).toMatchObject({ netDeposits: '1000.00', totalValue: '842.40', totalResult: '-157.60', totalResultPct: '-15.8', cash: '542.40' });
+    expect(view).toMatchObject({
+      netDeposits: '1000.00',
+      totalValue: '842.40',
+      totalResult: '-157.60',
+      totalResultPct: '-15.8',
+      cash: '542.40',
+    });
   });
 
   it('explains the total result line by line, with nothing left over', () => {
@@ -74,7 +104,11 @@ describe('buildPortfolioView', () => {
       currency: 'EUR',
       asOf: new Date(),
     });
-    expect(v.positions[0]).toMatchObject({ ticker: 'X', cost: '80.00', result: '20.00' });
+    expect(v.positions[0]).toMatchObject({
+      ticker: 'X',
+      cost: '80.00',
+      result: '20.00',
+    });
     expect(v.totalResultPct).toBeNull();
   });
 });

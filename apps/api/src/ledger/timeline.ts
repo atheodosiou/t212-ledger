@@ -39,7 +39,15 @@ export interface Timeline {
   instruments: InstrumentTimeline[];
 }
 
-type MoneyField = 'deposits' | 'withdrawals' | 'purchases' | 'saleProceeds' | 'realisedPnl' | 'dividends' | 'interest' | 'fees';
+type MoneyField =
+  | 'deposits'
+  | 'withdrawals'
+  | 'purchases'
+  | 'saleProceeds'
+  | 'realisedPnl'
+  | 'dividends'
+  | 'interest'
+  | 'fees';
 
 export function buildTimeline(
   entries: EngineEntry[],
@@ -49,7 +57,10 @@ export function buildTimeline(
   const engine = computeCostBasis(entries, method, timeZone);
   const monthOf = monthKey(timeZone);
 
-  const buckets = new Map<string, Record<MoneyField, Decimal> & { buys: number; sells: number }>();
+  const buckets = new Map<
+    string,
+    Record<MoneyField, Decimal> & { buys: number; sells: number }
+  >();
   const bucket = (month: string) => {
     let b = buckets.get(month);
     if (!b) {
@@ -135,7 +146,14 @@ export function buildTimeline(
     const key = event.isin ?? event.ticker;
     let item = byInstrument.get(key);
     if (!item) {
-      item = { ticker: event.ticker, isin: event.isin, instrumentName: event.instrumentName, trades: 0, currentQuantity: '0', events: [] };
+      item = {
+        ticker: event.ticker,
+        isin: event.isin,
+        instrumentName: event.instrumentName,
+        trades: 0,
+        currentQuantity: '0',
+        events: [],
+      };
       byInstrument.set(key, item);
     }
     item.events.push(event);
@@ -147,12 +165,18 @@ export function buildTimeline(
     method,
     months,
     // Most traded first; ties alphabetically.
-    instruments: [...byInstrument.values()].sort((a, b) => b.trades - a.trades || a.ticker.localeCompare(b.ticker)),
+    instruments: [...byInstrument.values()].sort(
+      (a, b) => b.trades - a.trades || a.ticker.localeCompare(b.ticker),
+    ),
   };
 }
 
 function monthKey(timeZone: string): (date: Date) => string {
-  const format = new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit' });
+  const format = new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+  });
   return (date) => format.format(date).slice(0, 7);
 }
 
@@ -163,7 +187,11 @@ export function fillMonths(keys: string[]): string[] {
   const [startY, startM] = sorted[0].split('-').map(Number);
   const [endY, endM] = sorted[sorted.length - 1].split('-').map(Number);
   const out: string[] = [];
-  for (let y = startY, m = startM; y < endY || (y === endY && m <= endM); m === 12 ? (y++, (m = 1)) : m++) {
+  for (
+    let y = startY, m = startM;
+    y < endY || (y === endY && m <= endM);
+    m === 12 ? (y++, (m = 1)) : m++
+  ) {
     out.push(`${y}-${String(m).padStart(2, '0')}`);
   }
   return out;

@@ -1,9 +1,23 @@
 import { Injectable } from '@nestjs/common';
 import { InjectDrizzle } from '@nestjs/drizzle';
 import { Decimal } from 'decimal.js';
-import { and, asc, count, desc, eq, ilike, inArray, or, sql, type SQL } from 'drizzle-orm';
+import {
+  and,
+  asc,
+  count,
+  desc,
+  eq,
+  ilike,
+  inArray,
+  or,
+  sql,
+  type SQL,
+} from 'drizzle-orm';
 import type { Db } from '../db/db.js';
-import { fallbackDisplayTicker, InstrumentsService } from '../trading212/instruments.service.js';
+import {
+  fallbackDisplayTicker,
+  InstrumentsService,
+} from '../trading212/instruments.service.js';
 import {
   instruments,
   ledgerEntries,
@@ -22,7 +36,13 @@ import {
 } from './cost-basis.js';
 import { estimateDividends, type DividendDetail } from './dividends.js';
 import { normalizeRaw, type LedgerKind } from './normalize.js';
-import { matches, pageInMemory, toPage, type Page, type PageRequest } from './paging.js';
+import {
+  matches,
+  pageInMemory,
+  toPage,
+  type Page,
+  type PageRequest,
+} from './paging.js';
 import { buildTimeline, type Timeline } from './timeline.js';
 
 const INSERT_CHUNK = 500;
@@ -76,9 +96,14 @@ export class LedgerService {
    */
   async rebuild(accountId: string): Promise<number> {
     return this.db.transaction(async (tx) => {
-      const raws = await tx.select().from(rawEvents).where(eq(rawEvents.accountId, accountId));
+      const raws = await tx
+        .select()
+        .from(rawEvents)
+        .where(eq(rawEvents.accountId, accountId));
       const rows = await this.toLedgerRows(accountId, raws);
-      await tx.delete(ledgerEntries).where(eq(ledgerEntries.accountId, accountId));
+      await tx
+        .delete(ledgerEntries)
+        .where(eq(ledgerEntries.accountId, accountId));
       for (let i = 0; i < rows.length; i += INSERT_CHUNK) {
         await tx.insert(ledgerEntries).values(rows.slice(i, i + INSERT_CHUNK));
       }
@@ -94,7 +119,12 @@ export class LedgerService {
       const raws = await this.db
         .select()
         .from(rawEvents)
-        .where(and(eq(rawEvents.accountId, accountId), inArray(rawEvents.id, rawEventIds.slice(i, i + INSERT_CHUNK))));
+        .where(
+          and(
+            eq(rawEvents.accountId, accountId),
+            inArray(rawEvents.id, rawEventIds.slice(i, i + INSERT_CHUNK)),
+          ),
+        );
       const rows = await this.toLedgerRows(accountId, raws);
       if (rows.length) {
         // A raw event maps to at most one entry; the unique index makes a repeat a no-op.
@@ -121,15 +151,23 @@ export class LedgerService {
     return result.rowCount ?? 0;
   }
 
-  private async toLedgerRows(accountId: string, raws: RawEvent[]): Promise<NewLedgerEntry[]> {
+  private async toLedgerRows(
+    accountId: string,
+    raws: RawEvent[],
+  ): Promise<NewLedgerEntry[]> {
     const rows: NewLedgerEntry[] = [];
     for (const raw of raws) {
       const normalized = normalizeRaw(raw.source, raw.payload);
-      if (normalized) rows.push({ ...normalized, accountId, rawEventId: raw.id });
+      if (normalized)
+        rows.push({ ...normalized, accountId, rawEventId: raw.id });
     }
-    const names = await this.instruments.displayTickers(rows.map((r) => r.ticker ?? ''));
+    const names = await this.instruments.displayTickers(
+      rows.map((r) => r.ticker ?? ''),
+    );
     for (const row of rows) {
-      if (row.ticker) row.displayTicker = names.get(row.ticker) ?? fallbackDisplayTicker(row.ticker);
+      if (row.ticker)
+        row.displayTicker =
+          names.get(row.ticker) ?? fallbackDisplayTicker(row.ticker);
     }
     return rows;
   }
@@ -186,7 +224,12 @@ export class LedgerService {
         .select()
         .from(ledgerEntries)
         .where(where)
-        .orderBy(nullsLast, order, asc(ledgerEntries.occurredAt), asc(ledgerEntries.id))
+        .orderBy(
+          nullsLast,
+          order,
+          asc(ledgerEntries.occurredAt),
+          asc(ledgerEntries.id),
+        )
         .limit(req.limit)
         .offset(req.offset),
       this.db.select({ total: count() }).from(ledgerEntries).where(where),
@@ -209,8 +252,12 @@ export class LedgerService {
         matches(filter.q, s.ticker, s.isin, s.instrumentName),
     );
     const sum = (pick: (s: RealisedSale) => string | null) =>
-      filtered.reduce((acc, s) => acc.plus(pick(s) ?? 0), new Decimal(0)).toFixed(2);
-    const page = pageInMemory(filtered, req, (s, sort) => (sort === 'date' ? s.date : s[sort]));
+      filtered
+        .reduce((acc, s) => acc.plus(pick(s) ?? 0), new Decimal(0))
+        .toFixed(2);
+    const page = pageInMemory(filtered, req, (s, sort) =>
+      sort === 'date' ? s.date : s[sort],
+    );
     return {
       ...page,
       totals: {
@@ -234,6 +281,9 @@ export class LedgerService {
     accountCurrency = 'EUR',
   ): Promise<EngineResult & { dividends: DividendDetail[] }> {
     const entries = await this.list(accountId);
-    return { ...computeCostBasis(entries, method), dividends: estimateDividends(entries, accountCurrency) };
+    return {
+      ...computeCostBasis(entries, method),
+      dividends: estimateDividends(entries, accountCurrency),
+    };
   }
 }

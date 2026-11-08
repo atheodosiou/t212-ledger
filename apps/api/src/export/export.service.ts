@@ -23,7 +23,12 @@ const CONTENT_TYPES: Record<ExportFormat, string> = {
 export class ExportService {
   constructor(private readonly ledger: LedgerService) {}
 
-  async export(account: BrokerAccount, format: ExportFormat, method: CostMethod, year: number | null): Promise<ExportFile> {
+  async export(
+    account: BrokerAccount,
+    format: ExportFormat,
+    method: CostMethod,
+    year: number | null,
+  ): Promise<ExportFile> {
     const entries = await this.ledger.list(account.id);
     const data = buildReportData(entries, {
       accountLabel: account.label,
@@ -33,8 +38,13 @@ export class ExportService {
       year,
       generatedAt: new Date(),
     });
-    const buffer = format === 'xlsx' ? await buildXlsx(data) : await buildPdf(data);
-    const slug = account.label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'account';
+    const buffer =
+      format === 'xlsx' ? await buildXlsx(data) : await buildPdf(data);
+    const slug =
+      account.label
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-|-$/g, '') || 'account';
     return {
       buffer,
       contentType: CONTENT_TYPES[format],

@@ -1,6 +1,9 @@
 import { Decimal } from 'decimal.js';
 import type { EngineEntry, EngineResult } from '../ledger/cost-basis.js';
-import type { T212AccountSummary, T212Position } from '../trading212/t212.types.js';
+import type {
+  T212AccountSummary,
+  T212Position,
+} from '../trading212/t212.types.js';
 
 export interface LivePosition {
   ticker: string;
@@ -68,21 +71,33 @@ export function buildPortfolioView(input: {
   const { summary, positions, engine, entries } = input;
 
   const sumCash = (kinds: string[]) =>
-    entries.filter((e) => kinds.includes(e.kind)).reduce((s, e) => s.plus(e.cashAmount), new Decimal(0));
+    entries
+      .filter((e) => kinds.includes(e.kind))
+      .reduce((s, e) => s.plus(e.cashAmount), new Decimal(0));
 
   const netDeposits = sumCash(['DEPOSIT', 'WITHDRAWAL']);
   const totalValue = d(summary.totalValue);
-  const cash = d(summary.cash?.availableToTrade).plus(d(summary.cash?.reservedForOrders)).plus(d(summary.cash?.inPies));
-  const investedValue = positions.reduce((s, p) => s.plus(p.walletImpact.currentValue), new Decimal(0));
+  const cash = d(summary.cash?.availableToTrade)
+    .plus(d(summary.cash?.reservedForOrders))
+    .plus(d(summary.cash?.inPies));
+  const investedValue = positions.reduce(
+    (s, p) => s.plus(p.walletImpact.currentValue),
+    new Decimal(0),
+  );
 
-  const costByIsin = new Map(engine.holdings.map((h) => [h.isin ?? h.ticker, d(h.costBasis)]));
+  const costByIsin = new Map(
+    engine.holdings.map((h) => [h.isin ?? h.ticker, d(h.costBasis)]),
+  );
   const live = positions.map((p) => {
     const value = d(p.walletImpact.currentValue);
     // Prefer our cost (fees included); fall back to Trading 212's when the history lacks the position.
-    const cost = costByIsin.get(p.instrument.isin) ?? d(p.walletImpact.totalCost);
+    const cost =
+      costByIsin.get(p.instrument.isin) ?? d(p.walletImpact.totalCost);
     const result = value.minus(cost);
     return {
-      ticker: input.displayTickers.get(p.instrument.ticker) ?? p.instrument.ticker.split('_')[0],
+      ticker:
+        input.displayTickers.get(p.instrument.ticker) ??
+        p.instrument.ticker.split('_')[0],
       isin: p.instrument.isin ?? null,
       instrumentName: p.instrument.name ?? null,
       quantity: d(p.quantity).toFixed(),
@@ -92,13 +107,21 @@ export function buildPortfolioView(input: {
       cost: cost.toFixed(2),
       result: result.toFixed(2),
       resultPct: cost.gt(0) ? result.div(cost).times(100).toFixed(1) : null,
-      weightPct: investedValue.gt(0) ? value.div(investedValue).times(100).toFixed(1) : '0.0',
-      fxImpact: p.walletImpact.fxImpact != null ? d(p.walletImpact.fxImpact).toFixed(2) : null,
+      weightPct: investedValue.gt(0)
+        ? value.div(investedValue).times(100).toFixed(1)
+        : '0.0',
+      fxImpact:
+        p.walletImpact.fxImpact != null
+          ? d(p.walletImpact.fxImpact).toFixed(2)
+          : null,
     };
   });
   live.sort((a, b) => Number(b.value) - Number(a.value));
 
-  const realised = engine.sales.reduce((s, x) => s.plus(x.realisedPnl), new Decimal(0));
+  const realised = engine.sales.reduce(
+    (s, x) => s.plus(x.realisedPnl),
+    new Decimal(0),
+  );
   const unrealised = live.reduce((s, p) => s.plus(p.result), new Decimal(0));
   const lines: BreakdownLine[] = [
     { key: 'realised', amount: realised.toFixed(2) },
@@ -108,8 +131,13 @@ export function buildPortfolioView(input: {
     { key: 'fees', amount: sumCash(['FEE']).toFixed(2) },
     { key: 'other', amount: sumCash(['OTHER']).toFixed(2) },
   ];
-  const breakdown = lines.filter((l) => l.key !== 'other' || !d(l.amount).isZero());
-  const breakdownTotal = breakdown.reduce((s, l) => s.plus(l.amount), new Decimal(0));
+  const breakdown = lines.filter(
+    (l) => l.key !== 'other' || !d(l.amount).isZero(),
+  );
+  const breakdownTotal = breakdown.reduce(
+    (s, l) => s.plus(l.amount),
+    new Decimal(0),
+  );
   const totalResult = totalValue.minus(netDeposits);
 
   return {
@@ -120,7 +148,9 @@ export function buildPortfolioView(input: {
     cash: cash.toFixed(2),
     netDeposits: netDeposits.toFixed(2),
     totalResult: totalResult.toFixed(2),
-    totalResultPct: netDeposits.gt(0) ? totalResult.div(netDeposits).times(100).toFixed(1) : null,
+    totalResultPct: netDeposits.gt(0)
+      ? totalResult.div(netDeposits).times(100).toFixed(1)
+      : null,
     breakdown,
     breakdownTotal: breakdownTotal.toFixed(2),
     unexplained: totalResult.minus(breakdownTotal).toFixed(2),

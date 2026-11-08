@@ -90,7 +90,11 @@ export interface T212AccountSummary {
   currency?: string;
   /** Investments plus all cash, account currency. */
   totalValue: number;
-  cash?: { availableToTrade?: number; reservedForOrders?: number; inPies?: number };
+  cash?: {
+    availableToTrade?: number;
+    reservedForOrders?: number;
+    inPies?: number;
+  };
   investments?: {
     currentValue?: number;
     totalCost?: number;
@@ -128,7 +132,10 @@ export class T212ApiError extends Error {
 
 export class T212RateLimitError extends T212ApiError {
   constructor(readonly resetAt: Date) {
-    super(429, `Trading 212 rate limit reached; resets at ${resetAt.toISOString()}`);
+    super(
+      429,
+      `Trading 212 rate limit reached; resets at ${resetAt.toISOString()}`,
+    );
     this.name = 'T212RateLimitError';
   }
 }

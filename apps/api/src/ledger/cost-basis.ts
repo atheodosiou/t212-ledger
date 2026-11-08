@@ -115,7 +115,10 @@ interface Position {
 export const DEFAULT_TAX_TIME_ZONE = 'Europe/Athens';
 
 export function taxYearOf(timeZone: string): (date: Date) => number {
-  const format = new Intl.DateTimeFormat('en-GB', { timeZone, year: 'numeric' });
+  const format = new Intl.DateTimeFormat('en-GB', {
+    timeZone,
+    year: 'numeric',
+  });
   return (date) => Number(format.format(date));
 }
 
@@ -146,7 +149,9 @@ export function computeCostBasis(
   timeZone: string = DEFAULT_TAX_TIME_ZONE,
 ): EngineResult {
   const yearOf = taxYearOf(timeZone);
-  const sorted = [...entries].sort((a, b) => a.occurredAt.getTime() - b.occurredAt.getTime());
+  const sorted = [...entries].sort(
+    (a, b) => a.occurredAt.getTime() - b.occurredAt.getTime(),
+  );
   const positions = new Map<string, Position>();
   const sales: RealisedSale[] = [];
   const warnings: EngineWarning[] = [];
@@ -161,7 +166,12 @@ export function computeCostBasis(
   const warn = (entry: EngineEntry, message: string) =>
     warnings.push({ entryId: entry.id, date: entry.occurredAt, message });
   const positionEvents: PositionEvent[] = [];
-  const record = (entry: EngineEntry, pos: Position, quantity: Decimal, realisedPnl: Decimal | null) => {
+  const record = (
+    entry: EngineEntry,
+    pos: Position,
+    quantity: Decimal,
+    realisedPnl: Decimal | null,
+  ) => {
     const held = pos.lots.reduce((s, l) => s.plus(l.quantity), ZERO);
     const cost = pos.lots.reduce((s, l) => s.plus(l.cost), ZERO);
     positionEvents.push({
@@ -220,7 +230,10 @@ export function computeCostBasis(
         const cost = cash.abs();
         if (method === 'AVERAGE' && pos.lots.length > 0) {
           const pool = pos.lots[0];
-          pos.lots[0] = { quantity: pool.quantity.plus(quantity), cost: pool.cost.plus(cost) };
+          pos.lots[0] = {
+            quantity: pool.quantity.plus(quantity),
+            cost: pool.cost.plus(cost),
+          };
         } else {
           pos.lots.push({ quantity, cost });
         }
@@ -234,7 +247,10 @@ export function computeCostBasis(
         const quantity = new Decimal(entry.quantity ?? 0).abs();
         const { cost, unmatched } = consume(pos, quantity);
         if (unmatched.gt(EPS)) {
-          warn(entry, `${pos.ticker}: sold ${unmatched.toFixed()} more shares than the history shows were bought`);
+          warn(
+            entry,
+            `${pos.ticker}: sold ${unmatched.toFixed()} more shares than the history shows were bought`,
+          );
         }
         const proceeds = cash.abs();
         // Per-sale figures are rounded to cents, and the yearly total is the sum of those rounded figures,
@@ -267,13 +283,22 @@ export function computeCostBasis(
         if (entry.sourceType === 'STOCK_SPLIT' && held.gt(EPS)) {
           // Same total cost spread over more (or fewer) shares: scale every lot.
           const factor = held.plus(delta).div(held);
-          pos.lots = pos.lots.map((l) => ({ quantity: l.quantity.times(factor), cost: l.cost }));
+          pos.lots = pos.lots.map((l) => ({
+            quantity: l.quantity.times(factor),
+            cost: l.cost,
+          }));
         } else if (delta.gt(0)) {
           pos.lots.push({ quantity: delta, cost: ZERO });
-          warn(entry, `${pos.ticker}: ${entry.sourceType} added ${delta.toFixed()} shares at zero cost; review`);
+          warn(
+            entry,
+            `${pos.ticker}: ${entry.sourceType} added ${delta.toFixed()} shares at zero cost; review`,
+          );
         } else if (delta.lt(0)) {
           consume(pos, delta.abs());
-          warn(entry, `${pos.ticker}: ${entry.sourceType} removed ${delta.abs().toFixed()} shares; review`);
+          warn(
+            entry,
+            `${pos.ticker}: ${entry.sourceType} removed ${delta.abs().toFixed()} shares; review`,
+          );
         }
         record(entry, pos, delta, null);
         break;
@@ -284,7 +309,8 @@ export function computeCostBasis(
     }
   }
 
-  if (currentYear !== null) yearEndHoldings.set(currentYear, snapshot(positions));
+  if (currentYear !== null)
+    yearEndHoldings.set(currentYear, snapshot(positions));
 
   return {
     method,
@@ -292,18 +318,30 @@ export function computeCostBasis(
     holdings: snapshot(positions),
     years: [...totals.entries()]
       .sort(([a], [b]) => a - b)
-      .map(([year, t]) => ({ year, ...t, holdingsAtYearEnd: yearEndHoldings.get(year) ?? [] })),
+      .map(([year, t]) => ({
+        year,
+        ...t,
+        holdingsAtYearEnd: yearEndHoldings.get(year) ?? [],
+      })),
     warnings,
     positionEvents,
   };
 }
 
-function position(positions: Map<string, Position>, entry: EngineEntry): Position {
+function position(
+  positions: Map<string, Position>,
+  entry: EngineEntry,
+): Position {
   const key = entry.isin ?? entry.ticker ?? 'UNKNOWN';
   const ticker = entry.displayTicker ?? entry.ticker ?? key;
   let pos = positions.get(key);
   if (!pos) {
-    pos = { ticker, isin: entry.isin, instrumentName: entry.instrumentName, lots: [] };
+    pos = {
+      ticker,
+      isin: entry.isin,
+      instrumentName: entry.instrumentName,
+      lots: [],
+    };
     positions.set(key, pos);
   } else {
     // Latest names win, so a renamed company shows under its current ticker.
@@ -314,13 +352,18 @@ function position(positions: Map<string, Position>, entry: EngineEntry): Positio
 }
 
 /** Removes `quantity` shares from the front of the lot queue and returns their cost. */
-function consume(pos: Position, quantity: Decimal): { cost: Decimal; unmatched: Decimal } {
+function consume(
+  pos: Position,
+  quantity: Decimal,
+): { cost: Decimal; unmatched: Decimal } {
   let remaining = quantity;
   let cost = ZERO;
   while (remaining.gt(EPS) && pos.lots.length > 0) {
     const lot = pos.lots[0];
     const take = Decimal.min(lot.quantity, remaining);
-    const takeCost = lot.quantity.isZero() ? ZERO : lot.cost.times(take).div(lot.quantity);
+    const takeCost = lot.quantity.isZero()
+      ? ZERO
+      : lot.cost.times(take).div(lot.quantity);
     cost = cost.plus(takeCost);
     lot.quantity = lot.quantity.minus(take);
     lot.cost = lot.cost.minus(takeCost);

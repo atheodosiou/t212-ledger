@@ -45,10 +45,17 @@ export interface DividendDetail {
  * with the FX rate of the account's trade in that currency closest in time, which
  * makes the withholding an estimate (marked as such) unless no conversion is needed.
  */
-export function estimateDividends(entries: DividendInputEntry[], accountCurrency = 'EUR'): DividendDetail[] {
+export function estimateDividends(
+  entries: DividendInputEntry[],
+  accountCurrency = 'EUR',
+): DividendDetail[] {
   const fxByCurrency = new Map<string, { time: number; rate: Decimal }[]>();
   for (const e of entries) {
-    if ((e.kind === 'BUY' || e.kind === 'SELL') && e.fxRate && e.instrumentCurrency) {
+    if (
+      (e.kind === 'BUY' || e.kind === 'SELL') &&
+      e.fxRate &&
+      e.instrumentCurrency
+    ) {
       const list = fxByCurrency.get(e.instrumentCurrency) ?? [];
       list.push({ time: e.occurredAt.getTime(), rate: new Decimal(e.fxRate) });
       fxByCurrency.set(e.instrumentCurrency, list);
@@ -69,10 +76,18 @@ export function estimateDividends(entries: DividendInputEntry[], accountCurrency
     .sort((a, b) => a.occurredAt.getTime() - b.occurredAt.getTime())
     .map((e) => {
       const net = new Decimal(e.cashAmount);
-      const sameCurrency = !e.instrumentCurrency || e.instrumentCurrency === accountCurrency;
-      const rate = sameCurrency ? new Decimal(1) : nearestRate(e.instrumentCurrency!, e.occurredAt.getTime());
-      const grossAccount = e.grossAmount && rate && !rate.isZero() ? new Decimal(e.grossAmount).div(rate) : null;
-      const withheld = grossAccount ? Decimal.max(0, grossAccount.minus(net)) : null;
+      const sameCurrency =
+        !e.instrumentCurrency || e.instrumentCurrency === accountCurrency;
+      const rate = sameCurrency
+        ? new Decimal(1)
+        : nearestRate(e.instrumentCurrency!, e.occurredAt.getTime());
+      const grossAccount =
+        e.grossAmount && rate && !rate.isZero()
+          ? new Decimal(e.grossAmount).div(rate)
+          : null;
+      const withheld = grossAccount
+        ? Decimal.max(0, grossAccount.minus(net))
+        : null;
       return {
         entryId: e.id,
         date: e.occurredAt,
@@ -87,7 +102,9 @@ export function estimateDividends(entries: DividendInputEntry[], accountCurrency
         grossAccount: grossAccount ? grossAccount.toFixed(2) : null,
         withheld: withheld ? withheld.toFixed(2) : null,
         withholdingRate:
-          grossAccount && withheld && grossAccount.gt(0) ? withheld.div(grossAccount).times(100).toFixed(1) : null,
+          grossAccount && withheld && grossAccount.gt(0)
+            ? withheld.div(grossAccount).times(100).toFixed(1)
+            : null,
         estimated: !sameCurrency,
       };
     });

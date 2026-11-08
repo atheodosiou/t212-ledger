@@ -11,7 +11,10 @@ export class EncryptionService {
   private readonly key: Buffer;
 
   constructor(config: ConfigService<Env, true>) {
-    this.key = Buffer.from(config.get('CREDENTIAL_ENCRYPTION_KEY', { infer: true }), 'base64');
+    this.key = Buffer.from(
+      config.get('CREDENTIAL_ENCRYPTION_KEY', { infer: true }),
+      'base64',
+    );
   }
 
   encrypt(plain: string): string {
@@ -19,7 +22,9 @@ export class EncryptionService {
     const cipher = createCipheriv('aes-256-gcm', this.key, iv);
     const data = Buffer.concat([cipher.update(plain, 'utf8'), cipher.final()]);
     const tag = cipher.getAuthTag();
-    return [VERSION, iv, tag, data].map((p) => (typeof p === 'string' ? p : p.toString('base64url'))).join('.');
+    return [VERSION, iv, tag, data]
+      .map((p) => (typeof p === 'string' ? p : p.toString('base64url')))
+      .join('.');
   }
 
   decrypt(payload: string): string {
@@ -27,8 +32,15 @@ export class EncryptionService {
     if (version !== VERSION || !iv || !tag || !data) {
       throw new Error('Unsupported ciphertext format');
     }
-    const decipher = createDecipheriv('aes-256-gcm', this.key, Buffer.from(iv, 'base64url'));
+    const decipher = createDecipheriv(
+      'aes-256-gcm',
+      this.key,
+      Buffer.from(iv, 'base64url'),
+    );
     decipher.setAuthTag(Buffer.from(tag, 'base64url'));
-    return Buffer.concat([decipher.update(Buffer.from(data, 'base64url')), decipher.final()]).toString('utf8');
+    return Buffer.concat([
+      decipher.update(Buffer.from(data, 'base64url')),
+      decipher.final(),
+    ]).toString('utf8');
   }
 }

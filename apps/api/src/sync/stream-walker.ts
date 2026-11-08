@@ -70,9 +70,14 @@ export async function walkStream(options: WalkOptions): Promise<WalkResult> {
     for (;;) {
       visited.add(path);
       const { page } = await fetchAndStore(path);
-      const next = page.nextPagePath ? withLimit(page.nextPagePath, pageLimit) : null;
+      const next = page.nextPagePath
+        ? withLimit(page.nextPagePath, pageLimit)
+        : null;
       // A repeated cursor would loop forever; treat it as the end of history.
-      state = next && !visited.has(next) ? { backfillDone: false, resume: next } : { backfillDone: true, resume: null };
+      state =
+        next && !visited.has(next)
+          ? { backfillDone: false, resume: next }
+          : { backfillDone: true, resume: null };
       await options.saveState(state);
       if (state.backfillDone) break;
       path = next!;

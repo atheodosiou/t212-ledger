@@ -44,7 +44,10 @@ export interface ReportData {
   buys: ExportLedgerEntry[];
   dividends: DividendDetail[];
   /** Estimated gross dividends and tax withheld abroad, per year shown. */
-  dividendTax: Map<number, { gross: string; withheld: string; partial: boolean }>;
+  dividendTax: Map<
+    number,
+    { gross: string; withheld: string; partial: boolean }
+  >;
   cashMovements: ExportLedgerEntry[];
   corporateActions: ExportLedgerEntry[];
   /** Holdings at the end of the selected year, or now for the whole history / the running year. */
@@ -54,7 +57,13 @@ export interface ReportData {
   warnings: EngineWarning[];
 }
 
-const CASH_KINDS: LedgerKind[] = ['DEPOSIT', 'WITHDRAWAL', 'INTEREST', 'FEE', 'OTHER'];
+const CASH_KINDS: LedgerKind[] = [
+  'DEPOSIT',
+  'WITHDRAWAL',
+  'INTEREST',
+  'FEE',
+  'OTHER',
+];
 const TOTAL_FIELDS = [
   'deposits',
   'withdrawals',
@@ -72,24 +81,34 @@ const TOTAL_FIELDS = [
  */
 export function buildReportData(
   allEntries: ExportLedgerEntry[],
-  meta: Omit<ExportMeta, 'firstActivity' | 'lastActivity' | 'timeZone'> & { timeZone?: string },
+  meta: Omit<ExportMeta, 'firstActivity' | 'lastActivity' | 'timeZone'> & {
+    timeZone?: string;
+  },
 ): ReportData {
   const timeZone = meta.timeZone ?? DEFAULT_TAX_TIME_ZONE;
   const yearOf = taxYearOf(timeZone);
   const engine = computeCostBasis(allEntries, meta.method, timeZone);
-  const inRange = (date: Date) => meta.year === null || yearOf(date) === meta.year;
+  const inRange = (date: Date) =>
+    meta.year === null || yearOf(date) === meta.year;
 
   const entries = allEntries
     .filter((e) => inRange(e.occurredAt))
     .sort((a, b) => a.occurredAt.getTime() - b.occurredAt.getTime());
-  const years = engine.years.filter((y) => meta.year === null || y.year === meta.year);
+  const years = engine.years.filter(
+    (y) => meta.year === null || y.year === meta.year,
+  );
 
   const totals = Object.fromEntries(
     TOTAL_FIELDS.map((field) => [field, sumMoney(years.map((y) => y[field]))]),
   ) as ReportData['totals'];
 
-  const dividends = estimateDividends(allEntries, meta.currency).filter((d) => inRange(d.date));
-  const dividendTax = new Map<number, { gross: string; withheld: string; partial: boolean }>();
+  const dividends = estimateDividends(allEntries, meta.currency).filter((d) =>
+    inRange(d.date),
+  );
+  const dividendTax = new Map<
+    number,
+    { gross: string; withheld: string; partial: boolean }
+  >();
   for (const y of years) {
     const inYear = dividends.filter((d) => yearOf(d.date) === y.year);
     dividendTax.set(y.year, {
@@ -104,8 +123,12 @@ export function buildReportData(
     meta: {
       ...meta,
       timeZone,
-      firstActivity: allEntries.length ? new Date(Math.min(...allEntries.map((e) => e.occurredAt.getTime()))) : null,
-      lastActivity: allEntries.length ? new Date(Math.max(...allEntries.map((e) => e.occurredAt.getTime()))) : null,
+      firstActivity: allEntries.length
+        ? new Date(Math.min(...allEntries.map((e) => e.occurredAt.getTime())))
+        : null,
+      lastActivity: allEntries.length
+        ? new Date(Math.max(...allEntries.map((e) => e.occurredAt.getTime())))
+        : null,
     },
     years,
     totals,
@@ -115,7 +138,10 @@ export function buildReportData(
     dividendTax,
     cashMovements: entries.filter((e) => CASH_KINDS.includes(e.kind)),
     corporateActions: entries.filter((e) => e.kind === 'CORPORATE_ACTION'),
-    closingHoldings: meta.year === null ? engine.holdings : (years[0]?.holdingsAtYearEnd ?? []),
+    closingHoldings:
+      meta.year === null
+        ? engine.holdings
+        : (years[0]?.holdingsAtYearEnd ?? []),
     closingHoldingsTitle:
       meta.year === null || meta.year >= yearOf(meta.generatedAt)
         ? `Ανοιχτές θέσεις στις ${formatDate(meta.generatedAt, timeZone)}`
@@ -155,7 +181,12 @@ export function displayTicker(ticker: string | null): string {
 }
 
 export function formatDate(date: Date, timeZone: string): string {
-  return new Intl.DateTimeFormat('el-GR', { timeZone, day: '2-digit', month: '2-digit', year: 'numeric' }).format(date);
+  return new Intl.DateTimeFormat('el-GR', {
+    timeZone,
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  }).format(date);
 }
 
 export function formatDateTime(date: Date, timeZone: string): string {

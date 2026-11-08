@@ -42,7 +42,9 @@ export class T212Client {
     credentials: T212Credentials,
     private readonly fetchFn: typeof fetch = fetch,
   ) {
-    const token = Buffer.from(`${credentials.apiKey.trim()}:${credentials.apiSecret.trim()}`).toString('base64');
+    const token = Buffer.from(
+      `${credentials.apiKey.trim()}:${credentials.apiSecret.trim()}`,
+    ).toString('base64');
     this.authHeader = `Basic ${token}`;
     this.baseUrl = BASE_URLS[credentials.environment];
   }
@@ -65,9 +67,12 @@ export class T212Client {
    * Fetches one history page. `pathOrNext` is either a base history path or the
    * `nextPagePath` returned by the previous page (which already carries cursor/time).
    */
-  page<T extends T212OrderItem | T212Dividend | T212CashTransaction>(pathOrNext: string): Promise<T212Page<T>> {
+  page<T extends T212OrderItem | T212Dividend | T212CashTransaction>(
+    pathOrNext: string,
+  ): Promise<T212Page<T>> {
     const url = new URL(pathOrNext, this.baseUrl);
-    if (!url.searchParams.has('limit')) url.searchParams.set('limit', String(PAGE_SIZE));
+    if (!url.searchParams.has('limit'))
+      url.searchParams.set('limit', String(PAGE_SIZE));
     return this.get(url.pathname + url.search);
   }
 
@@ -78,11 +83,16 @@ export class T212Client {
     });
 
     if (res.status === 429) {
-      throw new T212RateLimitError(parseReset(res.headers.get('x-ratelimit-reset')));
+      throw new T212RateLimitError(
+        parseReset(res.headers.get('x-ratelimit-reset')),
+      );
     }
     if (!res.ok) {
       const body = await res.text().catch(() => '');
-      throw new T212ApiError(res.status, `Trading 212 ${res.status} on ${path.split('?')[0]}: ${body.slice(0, 200)}`);
+      throw new T212ApiError(
+        res.status,
+        `Trading 212 ${res.status} on ${path.split('?')[0]}: ${body.slice(0, 200)}`,
+      );
     }
     return (await res.json()) as T;
   }

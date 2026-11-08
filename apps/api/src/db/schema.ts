@@ -19,11 +19,18 @@ const money = (name: string) => numeric(name, { precision: 20, scale: 6 });
 export const users = pgTable('users', {
   id: uuid().primaryKey().defaultRandom(),
   email: text().notNull().unique(),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp('created_at', { withTimezone: true })
+    .notNull()
+    .defaultNow(),
 });
 
 export const brokerEnvironment = pgEnum('broker_environment', ['DEMO', 'LIVE']);
-export const syncStatus = pgEnum('sync_status', ['IDLE', 'QUEUED', 'RUNNING', 'FAILED']);
+export const syncStatus = pgEnum('sync_status', [
+  'IDLE',
+  'QUEUED',
+  'RUNNING',
+  'FAILED',
+]);
 
 export const brokerAccounts = pgTable(
   'broker_accounts',
@@ -48,7 +55,9 @@ export const brokerAccounts = pgTable(
     ledgerVersion: integer('ledger_version'),
     /** Last comparison of the replayed history with Trading 212 (see reconciliation/reconcile.ts). */
     reconciliation: jsonb('reconciliation').$type<Reconciliation>(),
-    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
   },
   (t) => [index('broker_accounts_user_idx').on(t.userId)],
 );
@@ -60,17 +69,22 @@ export interface StreamSyncState {
   resume: string | null;
 }
 
-export type SyncStreamsState = Partial<Record<'ORDER' | 'DIVIDEND' | 'TRANSACTION', StreamSyncState>>;
+export type SyncStreamsState = Partial<
+  Record<'ORDER' | 'DIVIDEND' | 'TRANSACTION', StreamSyncState>
+>;
 
 /** Small key/value store for app-wide bookkeeping (e.g. when instrument names were last checked). */
 export const appState = pgTable('app_state', {
   key: text().primaryKey(),
   value: jsonb().notNull(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true })
+    .notNull()
+    .defaultNow(),
 });
 
 /** Steps of a sync, in order. */
-export type SyncStage = 'ORDERS' | 'DIVIDENDS' | 'TRANSACTIONS' | 'INSTRUMENTS' | 'LEDGER' | 'CHECK';
+export type SyncStage =
+  'ORDERS' | 'DIVIDENDS' | 'TRANSACTIONS' | 'INSTRUMENTS' | 'LEDGER' | 'CHECK';
 
 export interface SyncProgress {
   orders: number;
@@ -82,7 +96,11 @@ export interface SyncProgress {
   waitingUntil?: string | null;
 }
 
-export const rawSource = pgEnum('raw_source', ['ORDER', 'DIVIDEND', 'TRANSACTION']);
+export const rawSource = pgEnum('raw_source', [
+  'ORDER',
+  'DIVIDEND',
+  'TRANSACTION',
+]);
 
 /** Immutable copy of every item returned by the Trading 212 history endpoints. */
 export const rawEvents = pgTable(
@@ -96,9 +114,13 @@ export const rawEvents = pgTable(
     externalId: text('external_id').notNull(),
     occurredAt: timestamp('occurred_at', { withTimezone: true }).notNull(),
     payload: jsonb().notNull(),
-    fetchedAt: timestamp('fetched_at', { withTimezone: true }).notNull().defaultNow(),
+    fetchedAt: timestamp('fetched_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
   },
-  (t) => [uniqueIndex('raw_events_identity').on(t.accountId, t.source, t.externalId)],
+  (t) => [
+    uniqueIndex('raw_events_identity').on(t.accountId, t.source, t.externalId),
+  ],
 );
 
 export const ledgerKind = pgEnum('ledger_kind', [
@@ -170,11 +192,12 @@ export const instruments = pgTable('instruments', {
   isin: text(),
   currency: text(),
   type: text(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true })
+    .notNull()
+    .defaultNow(),
 });
 
 export type BrokerAccount = typeof brokerAccounts.$inferSelect;
 export type RawEvent = typeof rawEvents.$inferSelect;
 export type LedgerEntry = typeof ledgerEntries.$inferSelect;
 export type NewLedgerEntry = typeof ledgerEntries.$inferInsert;
-

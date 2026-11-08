@@ -38,15 +38,29 @@ export class InstrumentsService {
    * only rows whose values changed. Returns how many rows were inserted or changed
    * (0 when nothing was fetched).
    */
-  async refreshIfNeeded(client: T212Client, tickers: string[], now = new Date()): Promise<number> {
+  async refreshIfNeeded(
+    client: T212Client,
+    tickers: string[],
+    now = new Date(),
+  ): Promise<number> {
     const unique = [...new Set(tickers.filter(Boolean))];
     const known = unique.length
-      ? await this.db.select({ ticker: instruments.ticker }).from(instruments).where(inArray(instruments.ticker, unique))
+      ? await this.db
+          .select({ ticker: instruments.ticker })
+          .from(instruments)
+          .where(inArray(instruments.ticker, unique))
       : [];
     const missing = unique.length - known.length;
 
-    const [checked] = await this.db.select().from(appState).where(eq(appState.key, CHECKED_KEY));
-    const reason = refreshReason(checked ? new Date(checked.value as string) : null, missing, now);
+    const [checked] = await this.db
+      .select()
+      .from(appState)
+      .where(eq(appState.key, CHECKED_KEY));
+    const reason = refreshReason(
+      checked ? new Date(checked.value as string) : null,
+      missing,
+      now,
+    );
     if (!reason) return 0;
 
     const list = await client.instruments();
@@ -88,9 +102,14 @@ export class InstrumentsService {
     await this.db
       .insert(appState)
       .values({ key: CHECKED_KEY, value: now.toISOString(), updatedAt: now })
-      .onConflictDoUpdate({ target: appState.key, set: { value: now.toISOString(), updatedAt: now } });
+      .onConflictDoUpdate({
+        target: appState.key,
+        set: { value: now.toISOString(), updatedAt: now },
+      });
 
-    this.logger.log(`Instrument metadata checked (${reason}): ${rows.length} instruments, ${changed} new or changed`);
+    this.logger.log(
+      `Instrument metadata checked (${reason}): ${rows.length} instruments, ${changed} new or changed`,
+    );
     return changed;
   }
 

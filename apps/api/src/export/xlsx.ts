@@ -22,13 +22,24 @@ interface Column<T> {
   total?: boolean;
 }
 
-const HEADER_FILL: ExcelJS.Fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F2937' } };
-const TOTAL_FILL: ExcelJS.Fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF3F4F6' } };
+const HEADER_FILL: ExcelJS.Fill = {
+  type: 'pattern',
+  pattern: 'solid',
+  fgColor: { argb: 'FF1F2937' },
+};
+const TOTAL_FILL: ExcelJS.Fill = {
+  type: 'pattern',
+  pattern: 'solid',
+  fgColor: { argb: 'FFF3F4F6' },
+};
 
 export async function buildXlsx(data: ReportData): Promise<Buffer> {
   const { meta } = data;
   const tz = meta.timeZone;
-  const money = meta.currency === 'EUR' ? '#,##0.00 "€";[Red]-#,##0.00 "€"' : `#,##0.00 "${meta.currency}";[Red]-#,##0.00 "${meta.currency}"`;
+  const money =
+    meta.currency === 'EUR'
+      ? '#,##0.00 "€";[Red]-#,##0.00 "€"'
+      : `#,##0.00 "${meta.currency}";[Red]-#,##0.00 "${meta.currency}"`;
   const formats: Record<ColumnType, string | undefined> = {
     text: undefined,
     date: 'dd/mm/yyyy hh:mm',
@@ -51,7 +62,15 @@ export async function buildXlsx(data: ReportData): Promise<Buffer> {
         .formatToParts(d)
         .map((p) => [p.type, p.value]),
     );
-    return new Date(Date.UTC(+parts.year, +parts.month - 1, +parts.day, +parts.hour % 24, +parts.minute));
+    return new Date(
+      Date.UTC(
+        +parts.year,
+        +parts.month - 1,
+        +parts.day,
+        +parts.hour % 24,
+        +parts.minute,
+      ),
+    );
   };
   const num = (v: string | null) => (v === null || v === '' ? null : Number(v));
 
@@ -59,9 +78,19 @@ export async function buildXlsx(data: ReportData): Promise<Buffer> {
   wb.creator = 't212-ledger';
   wb.created = meta.generatedAt;
 
-  function addTable<T>(name: string, title: string, columns: Column<T>[], rows: T[]): ExcelJS.Worksheet {
-    const ws = wb.addWorksheet(name, { views: [{ state: 'frozen', ySplit: 3 }] });
-    ws.columns = columns.map((c) => ({ width: c.width, style: { numFmt: formats[c.type] } }));
+  function addTable<T>(
+    name: string,
+    title: string,
+    columns: Column<T>[],
+    rows: T[],
+  ): ExcelJS.Worksheet {
+    const ws = wb.addWorksheet(name, {
+      views: [{ state: 'frozen', ySplit: 3 }],
+    });
+    ws.columns = columns.map((c) => ({
+      width: c.width,
+      style: { numFmt: formats[c.type] },
+    }));
     ws.getCell('A1').value = title;
     ws.getCell('A1').font = { bold: true, size: 13 };
 
@@ -95,27 +124,73 @@ export async function buildXlsx(data: ReportData): Promise<Buffer> {
         cell.font = { bold: true };
         if (!c.total) return;
         const col = ws.getColumn(i + 1).letter;
-        const result = rows.reduce((s, row) => s + (Number(c.value(row)) || 0), 0);
-        cell.value = { formula: `SUM(${col}4:${col}${3 + rows.length})`, result: Math.round(result * 100) / 100 };
+        const result = rows.reduce(
+          (s, row) => s + (Number(c.value(row)) || 0),
+          0,
+        );
+        cell.value = {
+          formula: `SUM(${col}4:${col}${3 + rows.length})`,
+          result: Math.round(result * 100) / 100,
+        };
       });
     }
-    ws.autoFilter = { from: { row: 3, column: 1 }, to: { row: 3, column: columns.length } };
+    ws.autoFilter = {
+      from: { row: 3, column: 1 },
+      to: { row: 3, column: columns.length },
+    };
     return ws;
   }
 
   // ── Σύνοψη ────────────────────────────────────────────────────────────────
-  const period = meta.year === null ? 'Όλο το ιστορικό' : `Φορολογικό έτος ${meta.year}`;
+  const period =
+    meta.year === null ? 'Όλο το ιστορικό' : `Φορολογικό έτος ${meta.year}`;
   const summary = addTable(
     'Σύνοψη',
     `Trading 212 · ${meta.accountLabel} · ${period}`,
     [
       { header: 'Έτος', width: 10, type: 'text', value: (y) => y.year },
-      { header: 'Καταθέσεις', width: 15, type: 'money', value: (y) => num(y.deposits), total: true },
-      { header: 'Αναλήψεις', width: 15, type: 'money', value: (y) => num(y.withdrawals), total: true },
-      { header: 'Αγορές (με χρεώσεις)', width: 18, type: 'money', value: (y) => num(y.purchases), total: true },
-      { header: 'Έσοδα πωλήσεων (μετά χρεώσεων)', width: 20, type: 'money', value: (y) => num(y.saleProceeds), total: true },
-      { header: 'Αποτέλεσμα πωλήσεων', width: 18, type: 'money', value: (y) => num(y.realisedPnl), total: true },
-      { header: 'Μερίσματα (καθαρά)', width: 16, type: 'money', value: (y) => num(y.dividends), total: true },
+      {
+        header: 'Καταθέσεις',
+        width: 15,
+        type: 'money',
+        value: (y) => num(y.deposits),
+        total: true,
+      },
+      {
+        header: 'Αναλήψεις',
+        width: 15,
+        type: 'money',
+        value: (y) => num(y.withdrawals),
+        total: true,
+      },
+      {
+        header: 'Αγορές (με χρεώσεις)',
+        width: 18,
+        type: 'money',
+        value: (y) => num(y.purchases),
+        total: true,
+      },
+      {
+        header: 'Έσοδα πωλήσεων (μετά χρεώσεων)',
+        width: 20,
+        type: 'money',
+        value: (y) => num(y.saleProceeds),
+        total: true,
+      },
+      {
+        header: 'Αποτέλεσμα πωλήσεων',
+        width: 18,
+        type: 'money',
+        value: (y) => num(y.realisedPnl),
+        total: true,
+      },
+      {
+        header: 'Μερίσματα (καθαρά)',
+        width: 16,
+        type: 'money',
+        value: (y) => num(y.dividends),
+        total: true,
+      },
       {
         header: 'Μερίσματα μικτά (εκτίμηση)',
         width: 16,
@@ -130,13 +205,28 @@ export async function buildXlsx(data: ReportData): Promise<Buffer> {
         value: (y) => num(data.dividendTax.get(y.year)?.withheld ?? null),
         total: true,
       },
-      { header: 'Τόκοι', width: 12, type: 'money', value: (y) => num(y.interest), total: true },
-      { header: 'Χρεώσεις', width: 12, type: 'money', value: (y) => num(y.fees), total: true },
+      {
+        header: 'Τόκοι',
+        width: 12,
+        type: 'money',
+        value: (y) => num(y.interest),
+        total: true,
+      },
+      {
+        header: 'Χρεώσεις',
+        width: 12,
+        type: 'money',
+        value: (y) => num(y.fees),
+        total: true,
+      },
     ],
     data.years,
   );
   const info: [string, string][] = [
-    ['Λογαριασμός', `${meta.accountLabel} (${meta.environment === 'DEMO' ? 'Practice' : 'Πραγματικά χρήματα'})`],
+    [
+      'Λογαριασμός',
+      `${meta.accountLabel} (${meta.environment === 'DEMO' ? 'Practice' : 'Πραγματικά χρήματα'})`,
+    ],
     ['Νόμισμα λογαριασμού', meta.currency],
     ['Μέθοδος κόστους κτήσης', METHOD_LABEL[meta.method]],
     ['Ώρα αναφοράς', `${meta.timeZone} (τα έτη κόβονται με τοπική ώρα)`],
@@ -147,7 +237,12 @@ export async function buildXlsx(data: ReportData): Promise<Buffer> {
         : '—',
     ],
     ['Δημιουργήθηκε', formatDateTime(meta.generatedAt, tz)],
-    ['Προειδοποιήσεις', data.warnings.length ? `${data.warnings.length} (βλ. φύλλο «Έλεγχος»)` : 'Καμία'],
+    [
+      'Προειδοποιήσεις',
+      data.warnings.length
+        ? `${data.warnings.length} (βλ. φύλλο «Έλεγχος»)`
+        : 'Καμία',
+    ],
     ['Σημείωση', FEES_NOTE],
     ['Μερίσματα', DIVIDENDS_NOTE],
     ['Αποποίηση', DISCLAIMER],
@@ -169,15 +264,60 @@ export async function buildXlsx(data: ReportData): Promise<Buffer> {
     `Πωλήσεις και αποτέλεσμα · ${period} · ${METHOD_LABEL[meta.method]}`,
     [
       { header: 'Ημερομηνία', width: 17, type: 'date', value: (s) => s.date },
-      { header: 'Ticker', width: 10, type: 'text', value: (s) => displayTicker(s.ticker) },
+      {
+        header: 'Ticker',
+        width: 10,
+        type: 'text',
+        value: (s) => displayTicker(s.ticker),
+      },
       { header: 'ISIN', width: 15, type: 'text', value: (s) => s.isin },
-      { header: 'Τίτλος', width: 30, type: 'text', value: (s) => s.instrumentName },
-      { header: 'Ποσότητα', width: 13, type: 'qty', value: (s) => num(s.quantity) },
-      { header: 'Έσοδο (μετά χρεώσεων)', width: 15, type: 'money', value: (s) => num(s.proceeds), total: true },
-      { header: 'Κόστος κτήσης', width: 15, type: 'money', value: (s) => num(s.costBasis), total: true },
-      { header: 'Αποτέλεσμα', width: 14, type: 'money', value: (s) => num(s.realisedPnl), total: true },
-      { header: 'Χρεώσεις πώλησης', width: 12, type: 'money', value: (s) => num(s.sellFees), total: true },
-      { header: 'Αποτέλεσμα κατά T212 (χωρίς χρεώσεις)', width: 16, type: 'money', value: (s) => num(s.brokerRealisedPnl), total: true },
+      {
+        header: 'Τίτλος',
+        width: 30,
+        type: 'text',
+        value: (s) => s.instrumentName,
+      },
+      {
+        header: 'Ποσότητα',
+        width: 13,
+        type: 'qty',
+        value: (s) => num(s.quantity),
+      },
+      {
+        header: 'Έσοδο (μετά χρεώσεων)',
+        width: 15,
+        type: 'money',
+        value: (s) => num(s.proceeds),
+        total: true,
+      },
+      {
+        header: 'Κόστος κτήσης',
+        width: 15,
+        type: 'money',
+        value: (s) => num(s.costBasis),
+        total: true,
+      },
+      {
+        header: 'Αποτέλεσμα',
+        width: 14,
+        type: 'money',
+        value: (s) => num(s.realisedPnl),
+        total: true,
+      },
+      {
+        header: 'Χρεώσεις πώλησης',
+        width: 12,
+        type: 'money',
+        value: (s) => num(s.sellFees),
+        total: true,
+      },
+      {
+        header: 'Αποτέλεσμα κατά T212 (χωρίς χρεώσεις)',
+        width: 16,
+        type: 'money',
+        value: (s) => num(s.brokerRealisedPnl),
+        total: true,
+      },
     ],
     data.sales,
   );
@@ -187,16 +327,58 @@ export async function buildXlsx(data: ReportData): Promise<Buffer> {
     'Αγορές',
     `Αγορές τίτλων · ${period}`,
     [
-      { header: 'Ημερομηνία', width: 17, type: 'date', value: (e) => e.occurredAt },
-      { header: 'Ticker', width: 10, type: 'text', value: (e) => displayTicker(e.displayTicker ?? e.ticker) },
+      {
+        header: 'Ημερομηνία',
+        width: 17,
+        type: 'date',
+        value: (e) => e.occurredAt,
+      },
+      {
+        header: 'Ticker',
+        width: 10,
+        type: 'text',
+        value: (e) => displayTicker(e.displayTicker ?? e.ticker),
+      },
       { header: 'ISIN', width: 15, type: 'text', value: (e) => e.isin },
-      { header: 'Τίτλος', width: 30, type: 'text', value: (e) => e.instrumentName },
-      { header: 'Ποσότητα', width: 13, type: 'qty', value: (e) => num(e.quantity) },
+      {
+        header: 'Τίτλος',
+        width: 30,
+        type: 'text',
+        value: (e) => e.instrumentName,
+      },
+      {
+        header: 'Ποσότητα',
+        width: 13,
+        type: 'qty',
+        value: (e) => num(e.quantity),
+      },
       { header: 'Τιμή', width: 11, type: 'price', value: (e) => num(e.price) },
-      { header: 'Νόμισμα τίτλου', width: 9, type: 'text', value: (e) => e.instrumentCurrency },
-      { header: 'Ισοτιμία', width: 11, type: 'price', value: (e) => num(e.fxRate) },
-      { header: 'Χρεώσεις', width: 11, type: 'money', value: (e) => num(e.fees), total: true },
-      { header: 'Συνολικό κόστος', width: 15, type: 'money', value: (e) => Math.abs(Number(e.cashAmount)), total: true },
+      {
+        header: 'Νόμισμα τίτλου',
+        width: 9,
+        type: 'text',
+        value: (e) => e.instrumentCurrency,
+      },
+      {
+        header: 'Ισοτιμία',
+        width: 11,
+        type: 'price',
+        value: (e) => num(e.fxRate),
+      },
+      {
+        header: 'Χρεώσεις',
+        width: 11,
+        type: 'money',
+        value: (e) => num(e.fees),
+        total: true,
+      },
+      {
+        header: 'Συνολικό κόστος',
+        width: 15,
+        type: 'money',
+        value: (e) => Math.abs(Number(e.cashAmount)),
+        total: true,
+      },
     ],
     data.buys,
   );
@@ -207,17 +389,70 @@ export async function buildXlsx(data: ReportData): Promise<Buffer> {
     `Μερίσματα · ${period}`,
     [
       { header: 'Ημερομηνία', width: 17, type: 'date', value: (d) => d.date },
-      { header: 'Ticker', width: 10, type: 'text', value: (d) => displayTicker(d.ticker) },
+      {
+        header: 'Ticker',
+        width: 10,
+        type: 'text',
+        value: (d) => displayTicker(d.ticker),
+      },
       { header: 'ISIN', width: 15, type: 'text', value: (d) => d.isin },
-      { header: 'Τίτλος', width: 28, type: 'text', value: (d) => d.instrumentName },
-      { header: 'Μετοχές', width: 12, type: 'qty', value: (d) => num(d.shares) },
-      { header: 'Μικτό (νόμισμα τίτλου)', width: 13, type: 'price', value: (d) => num(d.grossInstrument) },
-      { header: 'Νόμισμα', width: 8, type: 'text', value: (d) => d.instrumentCurrency },
-      { header: 'Ισοτιμία', width: 10, type: 'price', value: (d) => num(d.fxRate) },
-      { header: 'Μικτό σε € (εκτίμηση)', width: 14, type: 'money', value: (d) => num(d.grossAccount), total: true },
-      { header: 'Φόρος εξωτερικού (εκτίμηση)', width: 14, type: 'money', value: (d) => num(d.withheld), total: true },
-      { header: 'Ποσοστό %', width: 9, type: 'price', value: (d) => num(d.withholdingRate) },
-      { header: 'Καθαρό που πιστώθηκε', width: 14, type: 'money', value: (d) => num(d.net), total: true },
+      {
+        header: 'Τίτλος',
+        width: 28,
+        type: 'text',
+        value: (d) => d.instrumentName,
+      },
+      {
+        header: 'Μετοχές',
+        width: 12,
+        type: 'qty',
+        value: (d) => num(d.shares),
+      },
+      {
+        header: 'Μικτό (νόμισμα τίτλου)',
+        width: 13,
+        type: 'price',
+        value: (d) => num(d.grossInstrument),
+      },
+      {
+        header: 'Νόμισμα',
+        width: 8,
+        type: 'text',
+        value: (d) => d.instrumentCurrency,
+      },
+      {
+        header: 'Ισοτιμία',
+        width: 10,
+        type: 'price',
+        value: (d) => num(d.fxRate),
+      },
+      {
+        header: 'Μικτό σε € (εκτίμηση)',
+        width: 14,
+        type: 'money',
+        value: (d) => num(d.grossAccount),
+        total: true,
+      },
+      {
+        header: 'Φόρος εξωτερικού (εκτίμηση)',
+        width: 14,
+        type: 'money',
+        value: (d) => num(d.withheld),
+        total: true,
+      },
+      {
+        header: 'Ποσοστό %',
+        width: 9,
+        type: 'price',
+        value: (d) => num(d.withholdingRate),
+      },
+      {
+        header: 'Καθαρό που πιστώθηκε',
+        width: 14,
+        type: 'money',
+        value: (d) => num(d.net),
+        total: true,
+      },
     ],
     data.dividends,
   );
@@ -236,10 +471,31 @@ export async function buildXlsx(data: ReportData): Promise<Buffer> {
     'Μετρητά',
     `Καταθέσεις, αναλήψεις, τόκοι και χρεώσεις · ${period}`,
     [
-      { header: 'Ημερομηνία', width: 17, type: 'date', value: (e) => e.occurredAt },
-      { header: 'Είδος', width: 16, type: 'text', value: (e) => KIND_LABEL[e.kind] },
-      { header: 'Ποσό', width: 14, type: 'money', value: (e) => num(e.cashAmount), total: true },
-      { header: 'Τύπος Trading 212', width: 22, type: 'text', value: (e) => e.sourceType },
+      {
+        header: 'Ημερομηνία',
+        width: 17,
+        type: 'date',
+        value: (e) => e.occurredAt,
+      },
+      {
+        header: 'Είδος',
+        width: 16,
+        type: 'text',
+        value: (e) => KIND_LABEL[e.kind],
+      },
+      {
+        header: 'Ποσό',
+        width: 14,
+        type: 'money',
+        value: (e) => num(e.cashAmount),
+        total: true,
+      },
+      {
+        header: 'Τύπος Trading 212',
+        width: 22,
+        type: 'text',
+        value: (e) => e.sourceType,
+      },
     ],
     data.cashMovements,
   );
@@ -249,12 +505,38 @@ export async function buildXlsx(data: ReportData): Promise<Buffer> {
     'Θέσεις',
     `${data.closingHoldingsTitle} (κόστος κτήσης)`,
     [
-      { header: 'Ticker', width: 10, type: 'text', value: (h) => displayTicker(h.ticker) },
+      {
+        header: 'Ticker',
+        width: 10,
+        type: 'text',
+        value: (h) => displayTicker(h.ticker),
+      },
       { header: 'ISIN', width: 15, type: 'text', value: (h) => h.isin },
-      { header: 'Τίτλος', width: 30, type: 'text', value: (h) => h.instrumentName },
-      { header: 'Ποσότητα', width: 14, type: 'qty', value: (h) => num(h.quantity) },
-      { header: 'Κόστος κτήσης', width: 15, type: 'money', value: (h) => num(h.costBasis), total: true },
-      { header: 'Μέση τιμή ανά μετοχή', width: 15, type: 'money', value: (h) => num(h.averageCost) },
+      {
+        header: 'Τίτλος',
+        width: 30,
+        type: 'text',
+        value: (h) => h.instrumentName,
+      },
+      {
+        header: 'Ποσότητα',
+        width: 14,
+        type: 'qty',
+        value: (h) => num(h.quantity),
+      },
+      {
+        header: 'Κόστος κτήσης',
+        width: 15,
+        type: 'money',
+        value: (h) => num(h.costBasis),
+        total: true,
+      },
+      {
+        header: 'Μέση τιμή ανά μετοχή',
+        width: 15,
+        type: 'money',
+        value: (h) => num(h.averageCost),
+      },
     ],
     data.closingHoldings,
   );
@@ -264,17 +546,62 @@ export async function buildXlsx(data: ReportData): Promise<Buffer> {
     'Όλες οι κινήσεις',
     `Πλήρες ημερολόγιο κινήσεων · ${period}`,
     [
-      { header: 'Ημερομηνία', width: 17, type: 'date', value: (e) => e.occurredAt },
-      { header: 'Είδος', width: 16, type: 'text', value: (e) => KIND_LABEL[e.kind] },
-      { header: 'Ticker', width: 10, type: 'text', value: (e) => displayTicker(e.displayTicker ?? e.ticker) },
+      {
+        header: 'Ημερομηνία',
+        width: 17,
+        type: 'date',
+        value: (e) => e.occurredAt,
+      },
+      {
+        header: 'Είδος',
+        width: 16,
+        type: 'text',
+        value: (e) => KIND_LABEL[e.kind],
+      },
+      {
+        header: 'Ticker',
+        width: 10,
+        type: 'text',
+        value: (e) => displayTicker(e.displayTicker ?? e.ticker),
+      },
       { header: 'ISIN', width: 15, type: 'text', value: (e) => e.isin },
-      { header: 'Τίτλος', width: 30, type: 'text', value: (e) => e.instrumentName },
-      { header: 'Ποσότητα', width: 13, type: 'qty', value: (e) => num(e.quantity) },
+      {
+        header: 'Τίτλος',
+        width: 30,
+        type: 'text',
+        value: (e) => e.instrumentName,
+      },
+      {
+        header: 'Ποσότητα',
+        width: 13,
+        type: 'qty',
+        value: (e) => num(e.quantity),
+      },
       { header: 'Τιμή', width: 11, type: 'price', value: (e) => num(e.price) },
-      { header: 'Νόμισμα τίτλου', width: 9, type: 'text', value: (e) => e.instrumentCurrency },
-      { header: 'Κίνηση μετρητών', width: 15, type: 'money', value: (e) => num(e.cashAmount) },
-      { header: 'Χρεώσεις', width: 11, type: 'money', value: (e) => num(e.fees) },
-      { header: 'Τύπος Trading 212', width: 20, type: 'text', value: (e) => e.sourceType },
+      {
+        header: 'Νόμισμα τίτλου',
+        width: 9,
+        type: 'text',
+        value: (e) => e.instrumentCurrency,
+      },
+      {
+        header: 'Κίνηση μετρητών',
+        width: 15,
+        type: 'money',
+        value: (e) => num(e.cashAmount),
+      },
+      {
+        header: 'Χρεώσεις',
+        width: 11,
+        type: 'money',
+        value: (e) => num(e.fees),
+      },
+      {
+        header: 'Τύπος Trading 212',
+        width: 20,
+        type: 'text',
+        value: (e) => e.sourceType,
+      },
     ],
     data.entries,
   );
@@ -286,7 +613,12 @@ export async function buildXlsx(data: ReportData): Promise<Buffer> {
       'Εγγραφές που χρειάζονται έλεγχο',
       [
         { header: 'Ημερομηνία', width: 17, type: 'date', value: (w) => w.date },
-        { header: 'Περιγραφή', width: 100, type: 'text', value: (w) => w.message },
+        {
+          header: 'Περιγραφή',
+          width: 100,
+          type: 'text',
+          value: (w) => w.message,
+        },
       ],
       [
         ...data.warnings,

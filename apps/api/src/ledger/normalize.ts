@@ -1,5 +1,9 @@
 import { Decimal } from 'decimal.js';
-import type { T212CashTransaction, T212Dividend, T212OrderItem } from '../trading212/t212.types.js';
+import type {
+  T212CashTransaction,
+  T212Dividend,
+  T212OrderItem,
+} from '../trading212/t212.types.js';
 import { checkRaw } from './raw-schemas.js';
 
 /**
@@ -73,7 +77,10 @@ export function normalizeOrder(item: T212OrderItem): NormalizedEntry | null {
   const { order, fill } = item;
   if (!fill) return null;
 
-  const fees = (fill.walletImpact.taxes ?? []).reduce((sum, t) => sum.plus(d(t.quantity).abs()), d(0));
+  const fees = (fill.walletImpact.taxes ?? []).reduce(
+    (sum, t) => sum.plus(d(t.quantity).abs()),
+    d(0),
+  );
   const shares = d(fill.quantity).abs();
   const isTrade = fill.type === 'TRADE';
   const isBuy = order.side === 'BUY';
@@ -113,7 +120,9 @@ export function normalizeOrder(item: T212OrderItem): NormalizedEntry | null {
     cashAmount: str(isBuy ? net.neg() : net),
     fees: str(fees),
     brokerRealisedPnl:
-      fill.walletImpact.realisedProfitLoss != null ? str(d(fill.walletImpact.realisedProfitLoss)) : null,
+      fill.walletImpact.realisedProfitLoss != null
+        ? str(d(fill.walletImpact.realisedProfitLoss))
+        : null,
   };
 }
 
@@ -125,7 +134,8 @@ export function normalizeDividend(item: T212Dividend): NormalizedEntry {
     ticker: item.instrument?.ticker ?? item.ticker,
     isin: item.instrument?.isin ?? null,
     instrumentName: item.instrument?.name ?? null,
-    instrumentCurrency: item.tickerCurrency ?? item.instrument?.currency ?? null,
+    instrumentCurrency:
+      item.tickerCurrency ?? item.instrument?.currency ?? null,
     quantity: str(d(item.quantity)),
     price: null,
     fxRate: null,
@@ -164,7 +174,9 @@ export function transactionKind(type: string): LedgerKind {
   return 'OTHER';
 }
 
-export function normalizeTransaction(item: T212CashTransaction): NormalizedEntry {
+export function normalizeTransaction(
+  item: T212CashTransaction,
+): NormalizedEntry {
   const kind = transactionKind(item.type);
   const amount = d(item.amount);
   return {
@@ -191,7 +203,10 @@ export function normalizeTransaction(item: T212CashTransaction): NormalizedEntry
  * records whose shape is not what we expect: those stay in raw_events and are reported
  * by the reconciliation instead of being turned into wrong amounts.
  */
-export function normalizeRaw(source: RawSource, payload: unknown): NormalizedEntry | null {
+export function normalizeRaw(
+  source: RawSource,
+  payload: unknown,
+): NormalizedEntry | null {
   if (checkRaw(source, payload)) return null;
   switch (source) {
     case 'ORDER':

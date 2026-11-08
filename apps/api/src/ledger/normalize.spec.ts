@@ -1,9 +1,23 @@
 import type { T212OrderItem } from '../trading212/t212.types.js';
-import { normalizeDividend, normalizeOrder, normalizeTransaction, orderIdentity, transactionKind } from './normalize.js';
+import {
+  normalizeDividend,
+  normalizeOrder,
+  normalizeTransaction,
+  orderIdentity,
+  transactionKind,
+} from './normalize.js';
 
-const btdr = { ticker: 'BTDR_US_EQ', name: 'Bitdeer Technologies Group', isin: 'KYG112481015', currency: 'USD' };
+const btdr = {
+  ticker: 'BTDR_US_EQ',
+  name: 'Bitdeer Technologies Group',
+  isin: 'KYG112481015',
+  currency: 'USD',
+};
 
-function order(overrides: Partial<T212OrderItem['order']>, fill: T212OrderItem['fill']): T212OrderItem {
+function order(
+  overrides: Partial<T212OrderItem['order']>,
+  fill: T212OrderItem['fill'],
+): T212OrderItem {
   return {
     order: {
       id: 59810257568,
@@ -36,7 +50,13 @@ describe('normalizeOrder', () => {
             currency: 'EUR',
             netValue: 49.94,
             fxRate: 1.12221776,
-            taxes: [{ name: 'CURRENCY_CONVERSION_FEE', quantity: -0.07, currency: 'EUR' }],
+            taxes: [
+              {
+                name: 'CURRENCY_CONVERSION_FEE',
+                quantity: -0.07,
+                currency: 'EUR',
+              },
+            ],
           },
         },
       ),
@@ -64,11 +84,21 @@ describe('normalizeOrder', () => {
           price: 16,
           type: 'TRADE',
           filledAt: '2026-12-01T10:00:00Z',
-          walletImpact: { currency: 'EUR', netValue: 142.5, fxRate: 1.12, realisedProfitLoss: 20.9 },
+          walletImpact: {
+            currency: 'EUR',
+            netValue: 142.5,
+            fxRate: 1.12,
+            realisedProfitLoss: 20.9,
+          },
         },
       ),
     );
-    expect(entry).toMatchObject({ kind: 'SELL', quantity: '-10', cashAmount: '142.5', brokerRealisedPnl: '20.9' });
+    expect(entry).toMatchObject({
+      kind: 'SELL',
+      quantity: '-10',
+      cashAmount: '142.5',
+      brokerRealisedPnl: '20.9',
+    });
   });
 
   it('skips orders that never filled', () => {
@@ -89,34 +119,74 @@ describe('normalizeOrder', () => {
         },
       ),
     );
-    expect(entry).toMatchObject({ kind: 'CORPORATE_ACTION', sourceType: 'STOCK_SPLIT', quantity: '10', cashAmount: '0' });
+    expect(entry).toMatchObject({
+      kind: 'CORPORATE_ACTION',
+      sourceType: 'STOCK_SPLIT',
+      quantity: '10',
+      cashAmount: '0',
+    });
   });
 
   it('identifies an order item by order and fill id', () => {
-    expect(orderIdentity(order({}, null)).externalId).toBe('59810257568:nofill');
+    expect(orderIdentity(order({}, null)).externalId).toBe(
+      '59810257568:nofill',
+    );
   });
 });
 
 describe('normalizeTransaction', () => {
   it('maps deposits, fees and interest', () => {
     const base = { currency: 'EUR', dateTime: '2026-11-02T10:00:00Z' };
-    expect(normalizeTransaction({ ...base, amount: 201.4, reference: 'a', type: 'DEPOSIT' })).toMatchObject({
+    expect(
+      normalizeTransaction({
+        ...base,
+        amount: 201.4,
+        reference: 'a',
+        type: 'DEPOSIT',
+      }),
+    ).toMatchObject({
       kind: 'DEPOSIT',
       cashAmount: '201.4',
       fees: '0',
     });
-    expect(normalizeTransaction({ ...base, amount: -1.4, reference: 'b', type: 'FEE' })).toMatchObject({
+    expect(
+      normalizeTransaction({
+        ...base,
+        amount: -1.4,
+        reference: 'b',
+        type: 'FEE',
+      }),
+    ).toMatchObject({
       kind: 'FEE',
       cashAmount: '-1.4',
       fees: '1.4',
     });
-    expect(normalizeTransaction({ ...base, amount: 0.01, reference: 'c', type: 'INTEREST' }).kind).toBe('INTEREST');
+    expect(
+      normalizeTransaction({
+        ...base,
+        amount: 0.01,
+        reference: 'c',
+        type: 'INTEREST',
+      }).kind,
+    ).toBe('INTEREST');
   });
 
   it('understands the type names used by real-money accounts', () => {
-    const base = { currency: 'EUR', dateTime: '2024-11-19T16:49:19Z', reference: 'r' };
-    expect(normalizeTransaction({ ...base, amount: 0.11, type: 'INTEREST_ON_FREE_CASH' }).kind).toBe('INTEREST');
-    expect(normalizeTransaction({ ...base, amount: -4.95, type: 'WITHDRAW' }).kind).toBe('WITHDRAWAL');
+    const base = {
+      currency: 'EUR',
+      dateTime: '2024-11-19T16:49:19Z',
+      reference: 'r',
+    };
+    expect(
+      normalizeTransaction({
+        ...base,
+        amount: 0.11,
+        type: 'INTEREST_ON_FREE_CASH',
+      }).kind,
+    ).toBe('INTEREST');
+    expect(
+      normalizeTransaction({ ...base, amount: -4.95, type: 'WITHDRAW' }).kind,
+    ).toBe('WITHDRAWAL');
   });
 
   it('classifies unseen variants by family', () => {
@@ -134,7 +204,10 @@ describe('normalizeTransaction', () => {
       reference: 'd',
       type: 'SOMETHING_NEW',
     });
-    expect(entry).toMatchObject({ kind: 'OTHER', note: 'Unmapped transaction type SOMETHING_NEW' });
+    expect(entry).toMatchObject({
+      kind: 'OTHER',
+      note: 'Unmapped transaction type SOMETHING_NEW',
+    });
   });
 });
 
@@ -150,6 +223,11 @@ describe('normalizeDividend', () => {
       tickerCurrency: 'USD',
       type: 'ORDINARY',
     });
-    expect(entry).toMatchObject({ kind: 'DIVIDEND', cashAmount: '2.55', grossAmount: '3', instrumentCurrency: 'USD' });
+    expect(entry).toMatchObject({
+      kind: 'DIVIDEND',
+      cashAmount: '2.55',
+      grossAmount: '3',
+      instrumentCurrency: 'USD',
+    });
   });
 });

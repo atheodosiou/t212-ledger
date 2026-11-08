@@ -16,13 +16,26 @@ export interface Page<T> {
   nextOffset: number | null;
 }
 
-export function toPage<T>(items: T[], total: number, req: { limit: number; offset: number }): Page<T> {
+export function toPage<T>(
+  items: T[],
+  total: number,
+  req: { limit: number; offset: number },
+): Page<T> {
   const next = req.offset + items.length;
-  return { items, total, offset: req.offset, limit: req.limit, nextOffset: next < total ? next : null };
+  return {
+    items,
+    total,
+    offset: req.offset,
+    limit: req.limit,
+    nextOffset: next < total ? next : null,
+  };
 }
 
 /** Case-insensitive substring match on any of the fields. */
-export function matches(query: string | undefined, ...fields: (string | null | undefined)[]): boolean {
+export function matches(
+  query: string | undefined,
+  ...fields: (string | null | undefined)[]
+): boolean {
   if (!query) return true;
   const q = query.trim().toLowerCase();
   return fields.some((f) => f?.toLowerCase().includes(q));
@@ -42,11 +55,16 @@ export function pageInMemory<T, S extends string>(
     .map((item, index) => ({ item, index, key: value(item, req.sort) }))
     .sort((a, b) => {
       // Empty values go last in both directions.
-      if (a.key === null || b.key === null) return a.key === b.key ? a.index - b.index : a.key === null ? 1 : -1;
+      if (a.key === null || b.key === null)
+        return a.key === b.key ? a.index - b.index : a.key === null ? 1 : -1;
       return compare(a.key, b.key) * factor || a.index - b.index;
     })
     .map((x) => x.item);
-  return toPage(sorted.slice(req.offset, req.offset + req.limit), items.length, req);
+  return toPage(
+    sorted.slice(req.offset, req.offset + req.limit),
+    items.length,
+    req,
+  );
 }
 
 function compare(a: string | number | Date, b: string | number | Date): number {
@@ -54,6 +72,7 @@ function compare(a: string | number | Date, b: string | number | Date): number {
   if (a instanceof Date && b instanceof Date) return a.getTime() - b.getTime();
   const na = Number(a);
   const nb = Number(b);
-  if (!Number.isNaN(na) && !Number.isNaN(nb) && a !== '' && b !== '') return na - nb;
+  if (!Number.isNaN(na) && !Number.isNaN(nb) && a !== '' && b !== '')
+    return na - nb;
   return String(a).localeCompare(String(b), 'el');
 }

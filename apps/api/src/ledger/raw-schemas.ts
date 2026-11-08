@@ -5,7 +5,9 @@ import type { RawSource } from './normalize.js';
 // allowed: Trading 212 adding something must not break anything, but a field we
 // use going missing or changing type must be caught, not turned into a wrong amount.
 
-const isoDate = z.string().refine((v) => !Number.isNaN(Date.parse(v)), 'not a date');
+const isoDate = z
+  .string()
+  .refine((v) => !Number.isNaN(Date.parse(v)), 'not a date');
 const finite = z.number().finite();
 
 const instrument = z.object({
