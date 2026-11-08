@@ -1,5 +1,6 @@
 import {
   index,
+  integer,
   jsonb,
   numeric,
   pgEnum,
@@ -40,10 +41,30 @@ export const brokerAccounts = pgTable(
     syncProgress: jsonb('sync_progress').$type<SyncProgress>(),
     syncError: text('sync_error'),
     lastSyncedAt: timestamp('last_synced_at', { withTimezone: true }),
+    /** Where each history stream's first full walk has got to; lets an interrupted walk resume. */
+    syncState: jsonb('sync_state').$type<SyncStreamsState>(),
+    /** Normalizer version the ledger was built with; a mismatch triggers one full rebuild. */
+    ledgerVersion: integer('ledger_version'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index('broker_accounts_user_idx').on(t.userId)],
 );
+
+export interface StreamSyncState {
+  /** True once every page of history has been stored at least once. */
+  backfillDone: boolean;
+  /** Next page of the first full walk to fetch, when it was interrupted. */
+  resume: string | null;
+}
+
+export type SyncStreamsState = Partial<Record<'ORDER' | 'DIVIDEND' | 'TRANSACTION', StreamSyncState>>;
+
+/** Small key/value store for app-wide bookkeeping (e.g. when instrument names were last checked). */
+export const appState = pgTable('app_state', {
+  key: text().primaryKey(),
+  value: jsonb().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
 
 /** Steps of a sync, in order. */
 export type SyncStage = 'ORDERS' | 'DIVIDENDS' | 'TRANSACTIONS' | 'INSTRUMENTS' | 'LEDGER';

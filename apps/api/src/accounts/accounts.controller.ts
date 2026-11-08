@@ -62,7 +62,8 @@ export class AccountsController {
   @Post()
   async create(@CurrentUser() user: CurrentUserData, @Body({ schema: createAccountSchema }) dto: CreateAccountDto) {
     const account = await this.accounts.create(user.id, dto);
-    const queued = await this.queue.enqueue(account.id, true);
+    // The first sync walks the whole history anyway, and can resume if interrupted.
+    const queued = await this.queue.enqueue(account.id, false);
     return { ...account, syncStatus: queued ? 'QUEUED' : account.syncStatus };
   }
 

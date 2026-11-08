@@ -10,8 +10,11 @@ Full investment history for Trading 212 accounts, with accountant-ready exports 
 
 1. A user connects a Trading 212 API key (read-only permissions are enough). Key and secret are stored AES-256-GCM encrypted.
 2. A background job pulls `history/orders`, `history/dividends` and `history/transactions` into `raw_events`, untouched.
-   It waits out Trading 212 rate limits instead of failing. Later syncs stop at the first page with nothing new.
-3. `ledger_entries` is derived from `raw_events` by pure functions (`src/ledger/normalize.ts`) and can be rebuilt at any time.
+   Records never change once Trading 212 returns them, and pages come newest first (orders by fill time), so a
+   routine sync downloads one small page per stream (10 records) and stops at the first record it already has.
+   The first sync walks the whole history and saves its position after every page, so an interrupted walk resumes
+   instead of starting over. Rate limits are waited out, not treated as failures.
+3. `ledger_entries` is derived from `raw_events` by pure functions (`src/ledger/normalize.ts`). New records are appended; the whole ledger is rebuilt only when `LEDGER_VERSION` changes. Instrument names are checked weekly, or early (at most hourly) when an unknown ticker appears, and only changed rows are written.
 4. `src/ledger/cost-basis.ts` replays the ledger (AVERAGE or FIFO) into realised P&L per sale, holdings, and per-year totals in the account currency.
 
 ## Run locally

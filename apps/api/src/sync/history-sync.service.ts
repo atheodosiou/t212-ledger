@@ -4,18 +4,26 @@ import { eq } from 'drizzle-orm';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { AccountsService } from '../accounts/accounts.service.js';
 import type { Db } from '../db/db.js';
-import { brokerAccounts, rawEvents, type SyncProgress, type SyncStage } from '../db/schema.js';
+import {
+  brokerAccounts,
+  rawEvents,
+  type SyncProgress,
+  type SyncStage,
+  type SyncStreamsState,
+} from '../db/schema.js';
 import { LedgerService } from '../ledger/ledger.service.js';
 import {
   dividendIdentity,
+  LEDGER_VERSION,
   orderIdentity,
   transactionIdentity,
   type RawIdentity,
   type RawSource,
 } from '../ledger/normalize.js';
 import { InstrumentsService } from '../trading212/instruments.service.js';
-import { HISTORY_PATHS, type T212Client } from '../trading212/t212.client.js';
+import { HISTORY_PATHS } from '../trading212/t212.client.js';
 import { T212RateLimitError } from '../trading212/t212.types.js';
+import { walkStream } from './stream-walker.js';
 
 const STAGE_OF: Record<RawSource, SyncStage> = {
   ORDER: 'ORDERS',
@@ -49,9 +57,12 @@ export class HistorySyncService {
   ) {}
 
   /**
-   * Pulls the account's history into raw_events and rebuilds its ledger.
-   * Incremental runs stop a stream at the first page that contains nothing new
-   * (pages come newest first); full runs walk every page.
+   * Brings the account's history up to date and extends its ledger.
+   *
+   * Stored records never change, so a routine sync downloads only a small newest
+   * page per stream and writes only what is new (see walkStream). The first sync
+   * walks the whole history and can resume where it stopped. `full` forgets the
+   * walk positions and walks everything again; it is never needed in normal use.
    */
   async run(accountId: string, full: boolean, signal?: AbortSignal): Promise<void> {
     const [account] = await this.db.select().from(brokerAccounts).where(eq(brokerAccounts.id, accountId));
@@ -65,21 +76,63 @@ export class HistorySyncService {
       return this.setState(accountId, { syncProgress: { ...progress } });
     };
 
+    const streams: SyncStreamsState = full ? {} : { ...account.syncState };
+    const newRawIds: string[] = [];
+    const newTickers: string[] = [];
+    let requests = 0;
+
     try {
       for (const source of ['ORDER', 'DIVIDEND', 'TRANSACTION'] as const) {
         await enter(STAGE_OF[source]);
-        await this.syncStream(client, accountId, source, full, progress, signal);
+        const result = await walkStream({
+          basePath: HISTORY_PATHS[source],
+          state: streams[source] ?? { backfillDone: false, resume: null },
+          fetchPage: (path) => this.withRateLimit(accountId, progress, () => client.page(path), signal),
+          store: async (items) => {
+            const stored = await this.storeRaw(accountId, source, items);
+            newRawIds.push(...stored.ids);
+            newTickers.push(...stored.tickers);
+            progress[PROGRESS_KEY[source]] += items.length;
+            await this.setState(accountId, { syncProgress: { ...progress } });
+            return stored.ids.length;
+          },
+          saveState: async (state) => {
+            streams[source] = state;
+            await this.setState(accountId, { syncState: { ...streams } });
+          },
+        });
+        requests += result.requests;
       }
+
       await enter('INSTRUMENTS');
+      let namesChanged = 0;
       try {
-        await this.withRateLimit(accountId, progress, () => this.instruments.refreshIfStale(client), signal);
+        namesChanged = await this.withRateLimit(
+          accountId,
+          progress,
+          () => this.instruments.refreshIfNeeded(client, newTickers),
+          signal,
+        );
       } catch (error) {
         // Display tickers are a nicety: keep the last known names rather than fail the sync.
         this.logger.warn(`Instrument metadata not refreshed: ${error instanceof Error ? error.message : String(error)}`);
       }
+
       await enter('LEDGER');
-      const entries = await this.ledger.rebuild(accountId);
-      this.logger.log(`Account ${accountId}: synced ${JSON.stringify(progress)}, ${entries} ledger entries`);
+      let ledgerNote: string;
+      if (account.ledgerVersion !== LEDGER_VERSION) {
+        const entries = await this.ledger.rebuild(accountId);
+        await this.setState(accountId, { ledgerVersion: LEDGER_VERSION });
+        ledgerNote = `rebuilt with rules v${LEDGER_VERSION} (${entries} entries)`;
+      } else {
+        const added = await this.ledger.append(accountId, newRawIds);
+        const renamed = namesChanged ? await this.ledger.refreshDisplayTickers(accountId) : 0;
+        ledgerNote = `${added} entries added, ${renamed} renamed`;
+      }
+
+      this.logger.log(
+        `Account ${accountId}: ${requests} requests, ${newRawIds.length} new records, ledger ${ledgerNote}`,
+      );
       await this.setState(accountId, {
         syncStatus: 'IDLE',
         syncProgress: { ...progress, stage: null, waitingUntil: null },
@@ -93,42 +146,25 @@ export class HistorySyncService {
     }
   }
 
-  private async syncStream(
-    client: T212Client,
+  /** Stores raw items, ignoring ones already stored. Returns the ids and tickers of the new ones. */
+  private async storeRaw(
     accountId: string,
     source: RawSource,
-    full: boolean,
-    progress: SyncProgress,
-    signal?: AbortSignal,
-  ): Promise<void> {
-    let next: string | null = HISTORY_PATHS[source];
-    const visited = new Set<string>();
-
-    while (next && !visited.has(next)) {
-      visited.add(next);
-      const path: string = next;
-      const page = await this.withRateLimit(accountId, progress, () => client.page(path), signal);
-
-      let inserted = 0;
-      if (page.items.length > 0) {
-        const rows = page.items.map((item) => {
-          const { externalId, occurredAt } = IDENTITY[source](item as never);
-          return { accountId, source, externalId, occurredAt, payload: item };
-        });
-        const result = await this.db
-          .insert(rawEvents)
-          .values(rows)
-          .onConflictDoNothing({ target: [rawEvents.accountId, rawEvents.source, rawEvents.externalId] })
-          .returning({ id: rawEvents.id });
-        inserted = result.length;
-      }
-
-      progress[PROGRESS_KEY[source]] += page.items.length;
-      await this.setState(accountId, { syncProgress: { ...progress } });
-
-      if (!full && page.items.length > 0 && inserted === 0) break;
-      next = page.nextPagePath;
-    }
+    items: unknown[],
+  ): Promise<{ ids: string[]; tickers: string[] }> {
+    const rows = items.map((item) => {
+      const { externalId, occurredAt } = IDENTITY[source](item as never);
+      return { accountId, source, externalId, occurredAt, payload: item };
+    });
+    const inserted = await this.db
+      .insert(rawEvents)
+      .values(rows)
+      .onConflictDoNothing({ target: [rawEvents.accountId, rawEvents.source, rawEvents.externalId] })
+      .returning({ id: rawEvents.id, payload: rawEvents.payload });
+    return {
+      ids: inserted.map((r) => r.id),
+      tickers: inserted.map((r) => rawTicker(r.payload)).filter((t): t is string => !!t),
+    };
   }
 
   /** Waits out Trading 212 rate-limit windows instead of failing the whole sync. */
@@ -155,4 +191,9 @@ export class HistorySyncService {
   private async setState(accountId: string, values: Partial<typeof brokerAccounts.$inferInsert>): Promise<void> {
     await this.db.update(brokerAccounts).set(values).where(eq(brokerAccounts.id, accountId));
   }
+}
+
+function rawTicker(payload: unknown): string | null {
+  const p = payload as { order?: { instrument?: { ticker?: string }; ticker?: string }; ticker?: string };
+  return p.order?.instrument?.ticker ?? p.order?.ticker ?? p.ticker ?? null;
 }

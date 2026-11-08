@@ -15,6 +15,13 @@
       "when": 1794092867207,
       "tag": "0001_instruments_display_ticker",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1794097312645,
+      "tag": "0002_sync_state",
+      "breakpoints": true
     }
   ]
 }

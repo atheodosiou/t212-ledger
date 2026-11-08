@@ -1,10 +1,17 @@
 import { Injectable } from '@nestjs/common';
 import { InjectDrizzle } from '@nestjs/drizzle';
 import { Decimal } from 'decimal.js';
-import { and, asc, count, desc, eq, ilike, or, sql, type SQL } from 'drizzle-orm';
+import { and, asc, count, desc, eq, ilike, inArray, or, sql, type SQL } from 'drizzle-orm';
 import type { Db } from '../db/db.js';
 import { fallbackDisplayTicker, InstrumentsService } from '../trading212/instruments.service.js';
-import { ledgerEntries, rawEvents, type LedgerEntry, type NewLedgerEntry } from '../db/schema.js';
+import {
+  instruments,
+  ledgerEntries,
+  rawEvents,
+  type LedgerEntry,
+  type NewLedgerEntry,
+  type RawEvent,
+} from '../db/schema.js';
 import {
   computeCostBasis,
   DEFAULT_TAX_TIME_ZONE,
@@ -63,27 +70,68 @@ export class LedgerService {
     private readonly instruments: InstrumentsService,
   ) {}
 
-  /** Re-derives the whole ledger of an account from its raw events. Returns the entry count. */
+  /**
+   * Re-derives the whole ledger of an account from its raw events. Only needed when
+   * the normalization rules change (see LEDGER_VERSION). Returns the entry count.
+   */
   async rebuild(accountId: string): Promise<number> {
     return this.db.transaction(async (tx) => {
       const raws = await tx.select().from(rawEvents).where(eq(rawEvents.accountId, accountId));
-      const rows: NewLedgerEntry[] = [];
-      for (const raw of raws) {
-        const normalized = normalizeRaw(raw.source, raw.payload);
-        if (normalized) rows.push({ ...normalized, accountId, rawEventId: raw.id });
-      }
-
-      const names = await this.instruments.displayTickers(rows.map((r) => r.ticker ?? ''));
-      for (const row of rows) {
-        if (row.ticker) row.displayTicker = names.get(row.ticker) ?? fallbackDisplayTicker(row.ticker);
-      }
-
+      const rows = await this.toLedgerRows(accountId, raws);
       await tx.delete(ledgerEntries).where(eq(ledgerEntries.accountId, accountId));
       for (let i = 0; i < rows.length; i += INSERT_CHUNK) {
         await tx.insert(ledgerEntries).values(rows.slice(i, i + INSERT_CHUNK));
       }
       return rows.length;
     });
+  }
+
+  /** Adds ledger entries for newly stored raw events only. Returns how many were added. */
+  async append(accountId: string, rawEventIds: string[]): Promise<number> {
+    if (!rawEventIds.length) return 0;
+    let added = 0;
+    for (let i = 0; i < rawEventIds.length; i += INSERT_CHUNK) {
+      const raws = await this.db
+        .select()
+        .from(rawEvents)
+        .where(and(eq(rawEvents.accountId, accountId), inArray(rawEvents.id, rawEventIds.slice(i, i + INSERT_CHUNK))));
+      const rows = await this.toLedgerRows(accountId, raws);
+      if (rows.length) {
+        // A raw event maps to at most one entry; the unique index makes a repeat a no-op.
+        const inserted = await this.db
+          .insert(ledgerEntries)
+          .values(rows)
+          .onConflictDoNothing({ target: ledgerEntries.rawEventId })
+          .returning({ id: ledgerEntries.id });
+        added += inserted.length;
+      }
+    }
+    return added;
+  }
+
+  /** Points entries at current market tickers, touching only rows whose name changed. */
+  async refreshDisplayTickers(accountId: string): Promise<number> {
+    const result = await this.db.execute(sql`
+      update ${ledgerEntries} le
+         set display_ticker = i.short_name
+        from ${instruments} i
+       where le.account_id = ${accountId}
+         and le.ticker = i.ticker
+         and le.display_ticker is distinct from i.short_name`);
+    return result.rowCount ?? 0;
+  }
+
+  private async toLedgerRows(accountId: string, raws: RawEvent[]): Promise<NewLedgerEntry[]> {
+    const rows: NewLedgerEntry[] = [];
+    for (const raw of raws) {
+      const normalized = normalizeRaw(raw.source, raw.payload);
+      if (normalized) rows.push({ ...normalized, accountId, rawEventId: raw.id });
+    }
+    const names = await this.instruments.displayTickers(rows.map((r) => r.ticker ?? ''));
+    for (const row of rows) {
+      if (row.ticker) row.displayTicker = names.get(row.ticker) ?? fallbackDisplayTicker(row.ticker);
+    }
+    return rows;
   }
 
   list(accountId: string, filter: LedgerFilter = {}): Promise<LedgerEntry[]> {

@@ -1,6 +1,13 @@
 import { Decimal } from 'decimal.js';
 import type { T212CashTransaction, T212Dividend, T212OrderItem } from '../trading212/t212.types.js';
 
+/**
+ * Bump whenever normalization rules change (new type mapping, different amounts...).
+ * Accounts whose ledger was built with another version get one full rebuild from
+ * their stored raw events on the next sync; otherwise only new records are added.
+ */
+export const LEDGER_VERSION = 2;
+
 export type RawSource = 'ORDER' | 'DIVIDEND' | 'TRANSACTION';
 export type LedgerKind =
   | 'BUY'
