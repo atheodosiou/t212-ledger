@@ -6,6 +6,7 @@ import { toView } from '../accounts/accounts.service.js';
 import type { Db } from '../db/db.js';
 import {
   brokerAccounts,
+  exportRows,
   ledgerEntries,
   rawEvents,
   sessions,
@@ -65,6 +66,13 @@ export class UserDataService {
           .where(inArray(ledgerEntries.accountId, ids))
           .orderBy(asc(ledgerEntries.occurredAt))
       : [];
+    const csvRows = ids.length
+      ? await this.db
+          .select()
+          .from(exportRows)
+          .where(inArray(exportRows.accountId, ids))
+          .orderBy(asc(exportRows.occurredAt))
+      : [];
 
     return {
       exportedAt: new Date().toISOString(),
@@ -86,6 +94,10 @@ export class UserDataService {
         ledger: ledger
           .filter((l) => l.accountId === account.id)
           .map(({ accountId: _a, id: _i, rawEventId: _r, ...l }) => l),
+        /** Trading 212's own CSV export of the account, row by row. */
+        tradingHistoryExport: csvRows
+          .filter((r) => r.accountId === account.id)
+          .map((r) => ({ occurredAt: r.occurredAt, row: r.payload })),
       })),
     };
   }

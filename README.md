@@ -16,6 +16,17 @@ Full investment history for Trading 212 accounts, with accountant-ready exports 
    instead of starting over. Rate limits are waited out, not treated as failures.
 3. `ledger_entries` is derived from `raw_events` by pure functions (`src/ledger/normalize.ts`). New records are appended; the whole ledger is rebuilt only when `LEDGER_VERSION` changes. Instrument names are checked weekly, or early (at most hourly) when an unknown ticker appears, and only changed rows are written.
 4. `src/ledger/cost-basis.ts` replays the ledger (AVERAGE or FIFO) into realised P&L per sale, holdings, and per-year totals in the account currency.
+5. After each sync a second background job (`src/exports`) fetches Trading 212's own CSV export of the account through
+   the API (`POST /history/exports`, then the report's download link), one tax year at a time. A year that ended is
+   fetched once; the running year again a day later at the earliest. The rows go to `export_rows`, untouched. They give
+   what the API leaves out, and are the reference every record is checked against:
+   - the tax withheld from each dividend (Trading 212's figure, not an estimate);
+   - "Dividend adjustment" rows: refunds of withheld tax, which the API sends as plain deposits;
+   - a line-by-line check: every fill, dividend and cash movement must be in both, with the same price, FX rate, total,
+     FX fee and Trading 212 "Result". The result shows in the account header; differences are listed on the overview.
+
+   Practice accounts have no export (Trading 212 refuses it); a key without the permission is reported, and the app
+   then falls back to the API alone (dividend tax estimated, and labelled so).
 
 ## Run locally
 
@@ -185,5 +196,13 @@ Browser ── https://ledger.theodosiou.me ──▶ Nginx (Contabo VPS)
 - Timeline page: monthly buys/sells chart (with table view) and a per-instrument chart of buys, sells and the average-cost step line (hand-written SVG, no chart library).
 - Verified on a practice account (2026-11-07): `walletImpact.netValue` includes FX fees (BUY: cost + fee, SELL: proceeds - fee). Our realised P&L includes fees; Trading 212's own `realisedProfitLoss` and position cost exclude them, so they differ by exactly the fees.
 - Verified on a real-money account (2026-11-08, 2 years, 709 trades, 24 dividends): positions match Trading 212 to 8 decimals; cost and realised P&L differ only by FX fees; cash reconciles to the cent. Real accounts use INTEREST_ON_FREE_CASH and WITHDRAW; internal tickers can be pre-merger names (NPA_US_EQ is ASTS), so display tickers come from instrument metadata (cached daily).
-- Dividend tax withheld abroad is not in the API: it is estimated from the gross per share and the FX rate of the nearest trade in that currency, and labelled as an estimate.
+- Checked against Trading 212's CSV exports of the real account (2026-11-08, 996 rows over 2024–2026): every fill,
+  dividend and cash movement identical; yearly sums of Trading 212's "Result" equal ours exactly. Two presentation fixes
+  came out of it: deposits are reported as credited (card deposit fees apart), and the one "Dividend adjustment" (a
+  0.08 EUR refund of 2025 US withholding) is no longer counted as a deposit.
+- Dividend tax withheld abroad is not in the API: it comes from the export. Without one (practice accounts, a key
+  without the permission) it is estimated from the gross per share and the FX rate of the nearest trade in that
+  currency, and labelled as an estimate.
+- Reports show two realised results: ours (FX fees deducted) and Trading 212's "Result" (fees not deducted); the
+  difference is exactly the FX fees.
 - Not yet seen in real data: corporate actions (splits etc.).

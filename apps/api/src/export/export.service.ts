@@ -37,6 +37,7 @@ export class ExportService {
       method,
       year,
       generatedAt: new Date(),
+      dividendExportRows: await this.ledger.dividendExportRows(account.id),
     });
     const buffer =
       format === 'xlsx' ? await buildXlsx(data) : await buildPdf(data);

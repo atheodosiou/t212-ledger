@@ -1,4 +1,9 @@
-import { estimateDividends, type DividendInputEntry } from './dividends.js';
+import {
+  DIVIDEND_ADJUSTMENT,
+  dividendDetails,
+  estimateDividends,
+  type DividendInputEntry,
+} from './dividends.js';
 
 let seq = 0;
 function e(
@@ -107,5 +112,93 @@ describe('estimateDividends', () => {
       }),
     ]);
     expect(d.withheld).toBe('0.00');
+  });
+});
+
+describe('dividendDetails with Trading 212 export rows', () => {
+  // Realty Income, real account (2025-11-14): the export states 0.28 USD withheld.
+  const realtyIncome = () =>
+    e({
+      kind: 'DIVIDEND',
+      occurredAt: at('2025-11-14T11:51:52Z'),
+      ticker: 'O_US_EQ',
+      displayTicker: 'O',
+      isin: 'US7561091049',
+      instrumentCurrency: 'USD',
+      quantity: '3.4637586',
+      grossAmount: '0.93348294',
+      cashAmount: '0.56',
+    });
+  const row = (over: Record<string, string> = {}) => ({
+    occurredAt: at('2025-11-14T11:51:52Z'),
+    action: 'Dividend (Dividend)',
+    payload: {
+      Action: 'Dividend (Dividend)',
+      ISIN: 'US7561091049',
+      'No. of shares': '3.4637586000',
+      'Price / share': '0.188650',
+      'Currency (Price / share)': 'USD',
+      'Exchange rate': '0.859084',
+      Total: '0.56',
+      'Currency (Total)': 'EUR',
+      'Withholding tax': '0.28',
+      'Currency (Withholding tax)': 'USD',
+      ...over,
+    },
+  });
+
+  it("uses Trading 212's own withholding, converted at the dividend's rate", () => {
+    const [d] = dividendDetails([realtyIncome()], 'EUR', [row()]);
+    expect(d).toMatchObject({
+      source: 'export',
+      estimated: false,
+      withheldOriginal: '0.28',
+      withheldCurrency: 'USD',
+      // 0.28 USD × 0.859084 EUR/USD
+      withheld: '0.2405',
+      grossAccount: '0.8005',
+    });
+  });
+
+  it('falls back to the estimate when the row does not add up to the net credited', () => {
+    const [d] = dividendDetails([realtyIncome()], 'EUR', [
+      row({ Total: '0.99' }),
+    ]);
+    expect(d.source).toBe('estimate');
+  });
+
+  it('ignores a row for other shares or another day', () => {
+    expect(
+      dividendDetails([realtyIncome()], 'EUR', [
+        row({ 'No. of shares': '3.5' }),
+      ])[0].source,
+    ).toBe('estimate');
+    expect(
+      dividendDetails([realtyIncome()], 'EUR', [
+        { ...row(), occurredAt: at('2025-11-20T00:00:00Z') },
+      ])[0].source,
+    ).toBe('estimate');
+  });
+
+  it('shows a withholding refund as negative tax, with its description', () => {
+    const [d] = dividendDetails(
+      [
+        e({
+          kind: 'DIVIDEND',
+          sourceType: DIVIDEND_ADJUSTMENT,
+          occurredAt: at('2026-04-06T16:09:27Z'),
+          cashAmount: '0.08',
+          note: '2025 US dividends withholding tax adjustment.',
+        }),
+      ],
+      'EUR',
+    );
+    expect(d).toMatchObject({
+      source: 'adjustment',
+      net: '0.08',
+      withheld: '-0.08',
+      grossAccount: '0.00',
+      note: '2025 US dividends withholding tax adjustment.',
+    });
   });
 });

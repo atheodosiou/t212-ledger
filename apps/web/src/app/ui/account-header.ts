@@ -3,6 +3,7 @@ import { RouterLink } from '@angular/router';
 import type { AccountState } from '../core/account-state';
 import { Api } from '../core/api';
 import { apiErrorMessage, dateTime, SYNC_LABEL } from '../core/format';
+import { ExportCheckStatus } from './export-check';
 import { ReconciliationStatus } from './reconciliation';
 
 export type AccountSection = 'overview' | 'accountant' | 'timeline';
@@ -10,7 +11,7 @@ export type AccountSection = 'overview' | 'accountant' | 'timeline';
 /** Account title, sync status, section navigation and the sync button. Lives in the sticky top of every account page. */
 @Component({
   selector: 'app-account-header',
-  imports: [RouterLink, ReconciliationStatus],
+  imports: [RouterLink, ReconciliationStatus, ExportCheckStatus],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'block' },
   template: `
@@ -42,6 +43,11 @@ export type AccountSection = 'overview' | 'accountant' | 'timeline';
           } @else if (acc?.lastSyncedAt) {
             Ενημερώθηκε {{ dateTime(acc!.lastSyncedAt!) }}
             <app-reconciliation-status [check]="acc!.reconciliation" [accountId]="accountId()" />
+            <app-export-check-status
+              [check]="acc!.exportCheck"
+              [state]="acc!.exportState"
+              [accountId]="accountId()"
+            />
           }
         </p>
       </div>

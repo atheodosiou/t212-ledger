@@ -2,6 +2,7 @@ import { Decimal } from 'decimal.js';
 import {
   computeCostBasis,
   DEFAULT_TAX_TIME_ZONE,
+  depositFeeIds,
   type CostMethod,
   type EngineEntry,
   type PositionEvent,
@@ -82,9 +83,15 @@ export function buildTimeline(
     return b;
   };
 
+  const depositFees = depositFeeIds(entries);
   for (const e of entries) {
     const b = bucket(monthOf(e.occurredAt));
     const cash = new Decimal(e.cashAmount);
+    if (depositFees.has(e.id)) {
+      // As Trading 212 reports it: the deposit net of its fee.
+      b.deposits = b.deposits.plus(cash);
+      continue;
+    }
     switch (e.kind) {
       case 'DEPOSIT':
         b.deposits = b.deposits.plus(cash);

@@ -8,3 +8,6 @@ coverage/
 /backups/
 .env.*
 !.env.example
+
+# Real account exports from Trading 212, for checking our figures. Never committed.
+/private/

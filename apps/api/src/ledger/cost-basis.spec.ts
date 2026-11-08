@@ -148,12 +148,14 @@ describe('computeCostBasis', () => {
     );
 
     expect(result.years.map((y) => y.year)).toEqual([2025, 2026]);
+    // The card deposit is reported as Trading 212 does: 200 credited, fee 1.40 apart.
     expect(result.years[0]).toMatchObject({
-      deposits: '201.4',
+      deposits: '200',
+      depositFees: '1.4',
       purchases: '100.07',
       dividends: '2.5',
       interest: '0.01',
-      fees: '1.47',
+      fees: '0.07',
       realisedPnl: '0',
     });
     expect(result.years[0].holdingsAtYearEnd).toEqual([

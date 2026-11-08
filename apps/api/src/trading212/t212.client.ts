@@ -5,6 +5,7 @@ import {
   type T212InstrumentMetadata,
   type T212CashTransaction,
   type T212Dividend,
+  type T212ExportReport,
   type T212Environment,
   type T212OrderItem,
   type T212Position,
@@ -24,6 +25,9 @@ export const HISTORY_PATHS = {
 
 export const PAGE_SIZE = 50;
 
+/** A whole year of a busy account is a few hundred kB; anything far beyond is not an export. */
+const MAX_EXPORT_BYTES = 20 * 1024 * 1024;
+
 export interface T212Credentials {
   apiKey: string;
   apiSecret: string;
@@ -31,8 +35,9 @@ export interface T212Credentials {
 }
 
 /**
- * Minimal, read-only Trading 212 client. Uses only GET endpoints, so a key
- * created with read permissions is sufficient.
+ * Minimal, read-only Trading 212 client. It never places or changes orders: besides
+ * GET endpoints it only asks for history exports (a CSV of the same data), so a key
+ * with read permissions is sufficient.
  */
 export class T212Client {
   private readonly authHeader: string;
@@ -64,6 +69,58 @@ export class T212Client {
   }
 
   /**
+   * Asks Trading 212 to build a CSV of the account's history between two instants
+   * (orders, dividends, interest, cash). Not available on practice accounts.
+   * Limited to one call per 30 seconds.
+   */
+  async requestExport(from: Date, to: Date): Promise<number> {
+    const { reportId } = await this.send<{ reportId: number }>(
+      'POST',
+      '/api/v0/equity/history/exports',
+      {
+        dataIncluded: {
+          includeDividends: true,
+          includeInterest: true,
+          includeOrders: true,
+          includeTransactions: true,
+        },
+        timeFrom: from.toISOString(),
+        timeTo: to.toISOString(),
+      },
+    );
+    return reportId;
+  }
+
+  /** Every export requested on the account and its status. One call per minute. */
+  exports(): Promise<T212ExportReport[]> {
+    return this.get('/api/v0/equity/history/exports');
+  }
+
+  /**
+   * Downloads a finished export. The link is pre-signed and on another host, so it is
+   * fetched without the API credentials.
+   */
+  async downloadExport(link: string): Promise<string> {
+    const url = new URL(link);
+    if (url.protocol !== 'https:') throw new Error('Export link is not https');
+    const res = await this.fetchFn(url, {
+      signal: AbortSignal.timeout(60_000),
+    });
+    if (!res.ok) {
+      throw new T212ApiError(
+        res.status,
+        `Export download failed: ${res.status}`,
+      );
+    }
+    const length = Number(res.headers.get('content-length') ?? 0);
+    if (length > MAX_EXPORT_BYTES) throw new Error('Export file too large');
+    const text = await res.text();
+    if (text.length > MAX_EXPORT_BYTES)
+      throw new Error('Export file too large');
+    return text;
+  }
+
+  /**
    * Fetches one history page. `pathOrNext` is either a base history path or the
    * `nextPagePath` returned by the previous page (which already carries cursor/time).
    */
@@ -76,9 +133,23 @@ export class T212Client {
     return this.get(url.pathname + url.search);
   }
 
-  private async get<T>(path: string): Promise<T> {
+  private get<T>(path: string): Promise<T> {
+    return this.send<T>('GET', path);
+  }
+
+  private async send<T>(
+    method: 'GET' | 'POST',
+    path: string,
+    body?: unknown,
+  ): Promise<T> {
     const res = await this.fetchFn(new URL(path, this.baseUrl), {
-      headers: { Authorization: this.authHeader, Accept: 'application/json' },
+      method,
+      headers: {
+        Authorization: this.authHeader,
+        Accept: 'application/json',
+        ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
+      },
+      body: body === undefined ? undefined : JSON.stringify(body),
       signal: AbortSignal.timeout(15_000),
     });
 

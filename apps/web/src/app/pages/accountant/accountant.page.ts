@@ -43,6 +43,7 @@ type HoldingSort = 'ticker' | 'quantity' | 'averageCost' | 'costBasis';
 
 const SUMMARY_FIELDS = [
   'deposits',
+  'depositFees',
   'withdrawals',
   'purchases',
   'saleProceeds',
@@ -77,6 +78,8 @@ export class AccountantPage {
   protected readonly method = signal<CostMethod>('AVERAGE');
   protected readonly report = httpResource<ReportDto>(() => {
     this.state.syncedAt();
+    // The export brings the exact dividend tax and reclassifies tax refunds.
+    this.state.exportedAt();
     return { url: `/api/accounts/${this.id()}/report`, params: { method: this.method() } };
   });
   /** Cards show placeholders while there is nothing (or nothing final) to show. */
@@ -144,6 +147,8 @@ export class AccountantPage {
     return {
       gross: sumMoney(dividends.map((d) => d.grossAccount ?? d.net)),
       withheld: sumMoney(dividends.map((d) => d.withheld)),
+      /** Some figures are estimates (no export of Trading 212 for them). */
+      estimated: dividends.some((d) => d.source === 'estimate'),
     };
   });
 
@@ -186,6 +191,7 @@ export class AccountantPage {
   protected readonly entries = new PagedList<LedgerEntryDto>(() => {
     if (this.tab() !== 'entries' || this.state.syncing() || !this.report.hasValue()) return null;
     this.state.syncedAt();
+    this.state.exportedAt();
     return {
       url: `/api/accounts/${this.id()}/ledger`,
       params: {
@@ -263,11 +269,12 @@ export class AccountantPage {
   ];
 
   protected readonly tiles: { field: SummaryField; label: string; hint?: string }[] = [
-    { field: 'deposits', label: 'Καταθέσεις' },
+    { field: 'deposits', label: 'Καταθέσεις', hint: 'όσα πιστώθηκαν' },
+    { field: 'depositFees', label: 'Χρεώσεις κατάθεσης', hint: 'πληρωμή με κάρτα' },
     { field: 'withdrawals', label: 'Αναλήψεις' },
     { field: 'dividends', label: 'Μερίσματα', hint: 'καθαρά' },
     { field: 'interest', label: 'Τόκοι' },
-    { field: 'fees', label: 'Χρεώσεις', hint: 'FX, κατάθεσης κ.ά.' },
+    { field: 'fees', label: 'Χρεώσεις συναλλαγών', hint: 'μετατροπή νομίσματος' },
   ];
 
   protected readonly kinds = Object.entries(KIND_LABEL) as [LedgerKind, string][];

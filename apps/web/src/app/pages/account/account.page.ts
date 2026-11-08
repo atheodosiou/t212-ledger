@@ -16,6 +16,7 @@ import { accountState } from '../../core/account-state';
 import { apiErrorMessage } from '../../core/format';
 import { whileActive } from '../../core/poll';
 import { AccountHeader } from '../../ui/account-header';
+import { ExportCheckPanel } from '../../ui/export-check';
 import { ReconciliationPanel } from '../../ui/reconciliation';
 import { SyncProgress } from '../../ui/sync-progress';
 import { StickyTop } from '../../ui/table';
@@ -36,6 +37,7 @@ const LIVE_REFRESH_MS = 60_000;
     SummaryBar,
     PositionsTable,
     ReconciliationPanel,
+    ExportCheckPanel,
   ],
   templateUrl: './account.page.html',
   changeDetection: ChangeDetectionStrategy.OnPush,

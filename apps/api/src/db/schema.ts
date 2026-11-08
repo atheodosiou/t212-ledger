@@ -11,6 +11,7 @@ import {
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
+import type { ExportCheck } from '../exports/export-check.js';
 import type { Reconciliation } from '../reconciliation/reconcile.js';
 
 /** Money and quantities are stored as NUMERIC and handled as strings / Decimal — never JS floats. */
@@ -121,11 +122,65 @@ export const brokerAccounts = pgTable(
     ledgerVersion: integer('ledger_version'),
     /** Last comparison of the replayed history with Trading 212 (see reconciliation/reconcile.ts). */
     reconciliation: jsonb('reconciliation').$type<Reconciliation>(),
+    /** Which years of Trading 212's CSV export have been fetched (see exports/exports.service.ts). */
+    exportState: jsonb('export_state').$type<ExportState>(),
+    /** Last line-by-line comparison of the API history with that export. */
+    exportCheck: jsonb('export_check').$type<ExportCheck>(),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),
   },
   (t) => [index('broker_accounts_user_idx').on(t.userId)],
+);
+
+export interface ExportYearState {
+  /** End of the period the last finished export of this year covered. */
+  coveredTo: string;
+  fetchedAt: string;
+  rows: number;
+}
+
+export interface ExportState {
+  /** Tax years (Europe/Athens) fetched, by year. */
+  years: Record<string, ExportYearState>;
+  /** Set while an export job runs. */
+  running?: { year: number; reportId: number | null; since: string } | null;
+  /** Why exports cannot be fetched, e.g. a practice account or a key without the permission. */
+  blocked?: {
+    reason: 'demo' | 'permission' | 'error';
+    message: string;
+    at: string;
+  } | null;
+}
+
+/**
+ * Trading 212's own CSV export of the account's history, row by row, untouched. It has
+ * what the API leaves out (the tax withheld from each dividend, what a cash movement
+ * really is) and is the reference the API history is checked against.
+ */
+export const exportRows = pgTable(
+  'export_rows',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    accountId: uuid('account_id')
+      .notNull()
+      .references(() => brokerAccounts.id, { onDelete: 'cascade' }),
+    /** The CSV ID, or the row's content when it has none (dividends). */
+    rowKey: text('row_key').notNull(),
+    action: text().notNull(),
+    occurredAt: timestamp('occurred_at', { withTimezone: true }).notNull(),
+    externalId: text('external_id'),
+    /** The CSV row, header → value. */
+    payload: jsonb().$type<Record<string, string>>().notNull(),
+    reportId: text('report_id').notNull(),
+    fetchedAt: timestamp('fetched_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('export_rows_identity').on(t.accountId, t.rowKey),
+    index('export_rows_account_action_idx').on(t.accountId, t.action),
+  ],
 );
 
 export interface StreamSyncState {
@@ -266,5 +321,6 @@ export const instruments = pgTable('instruments', {
 export type User = typeof users.$inferSelect;
 export type BrokerAccount = typeof brokerAccounts.$inferSelect;
 export type RawEvent = typeof rawEvents.$inferSelect;
+export type ExportRowRecord = typeof exportRows.$inferSelect;
 export type LedgerEntry = typeof ledgerEntries.$inferSelect;
 export type NewLedgerEntry = typeof ledgerEntries.$inferInsert;

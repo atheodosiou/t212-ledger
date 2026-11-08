@@ -96,13 +96,19 @@
         Μόνο όσα πούλησες μέσα στην περίοδο, με τις χρεώσεις. Δεν περιλαμβάνει όσα κρατάς ακόμα.
       </p>
       @if (brokerComparison(); as c) {
-        @if (Number(c.difference) !== 0) {
-          <div class="mt-4 rounded-lg bg-amber-50 p-3 text-xs leading-relaxed text-amber-900">
-            Το Trading 212 δείχνει <strong>{{ money(c.broker, cur) }}</strong
-            >. Η διαφορά των <strong>{{ money(c.difference, cur) }}</strong> είναι χρεώσεις (κυρίως
-            μετατροπής νομίσματος) που το Trading 212 δεν αφαιρεί από το αποτέλεσμα.
-          </div>
-        }
+        <div class="mt-4 rounded-lg bg-canvas p-3 text-xs leading-relaxed">
+          <p>
+            Κατά Trading 212 (το «Result» των πωλήσεων):
+            <strong>{{ money(c.broker, cur) }}</strong>
+          </p>
+          @if (Number(c.difference) !== 0) {
+            <p class="mt-1 text-muted">
+              Η διαφορά των {{ money(c.difference, cur) }} είναι οι χρεώσεις μετατροπής νομίσματος,
+              που το Trading 212 δεν αφαιρεί από το «Result». Η αναφορά για τον λογιστή δείχνει και
+              τα δύο.
+            </p>
+          }
+        </div>
       }
     }
   </section>
@@ -123,7 +129,14 @@
             <dd class="mt-1 font-semibold">{{ money(summary()![t.field], cur) }}</dd>
             @if (t.field === 'dividends' && dividendTax(); as dt) {
               <p class="mt-1 text-[11px] leading-snug text-muted">
-                μικτά ~{{ money(dt.gross, cur) }} · φόρος εξωτ. ~{{ money(dt.withheld, cur) }}
+                @let approx = dt.estimated ? '~' : '';
+                μικτά {{ approx }}{{ money(dt.gross, cur) }} · φόρος εξωτ. {{ approx
+                }}{{ money(dt.withheld, cur) }}
+                <span class="block">{{
+                  dt.estimated
+                    ? 'εκτίμηση, χωρίς export του Trading 212'
+                    : 'όπως στο export του Trading 212'
+                }}</span>
               </p>
             }
           }

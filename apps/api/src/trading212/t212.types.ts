@@ -140,6 +140,18 @@ export class T212RateLimitError extends T212ApiError {
   }
 }
 
+/** Item of GET /equity/history/exports: a CSV report of the account's history. */
+export interface T212ExportReport {
+  reportId: number;
+  status:
+    'Queued' | 'Processing' | 'Running' | 'Canceled' | 'Failed' | 'Finished';
+  /** Set once `status` is Finished: a pre-signed link on another host. */
+  downloadLink?: string | null;
+  timeFrom: string;
+  timeTo: string;
+  dataIncluded?: Record<string, boolean>;
+}
+
 /** Item of /equity/metadata/instruments. */
 export interface T212InstrumentMetadata {
   ticker: string;

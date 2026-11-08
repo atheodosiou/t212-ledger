@@ -23,6 +23,11 @@
 
   @if (!state.syncing()) {
     <app-reconciliation-panel class="mt-6" [check]="acc?.reconciliation ?? null" />
+    <app-export-check-panel
+      class="mt-6"
+      [check]="acc?.exportCheck ?? null"
+      [state]="acc?.exportState ?? null"
+    />
   }
 
   @if (portfolioError(); as message) {

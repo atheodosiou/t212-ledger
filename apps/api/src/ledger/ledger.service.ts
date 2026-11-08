@@ -19,6 +19,7 @@ import {
   InstrumentsService,
 } from '../trading212/instruments.service.js';
 import {
+  exportRows,
   instruments,
   ledgerEntries,
   rawEvents,
@@ -34,7 +35,12 @@ import {
   type EngineResult,
   type RealisedSale,
 } from './cost-basis.js';
-import { estimateDividends, type DividendDetail } from './dividends.js';
+import {
+  DIVIDEND_ADJUSTMENT,
+  dividendDetails,
+  type DividendDetail,
+  type DividendExportRow,
+} from './dividends.js';
 import { normalizeRaw, type LedgerKind } from './normalize.js';
 import {
   matches,
@@ -151,15 +157,75 @@ export class LedgerService {
     return result.rowCount ?? 0;
   }
 
+  /**
+   * Cash movements the API labels wrongly but Trading 212's export names: a "Dividend
+   * adjustment" (a refund or charge of tax withheld from dividends) arrives from the
+   * API as a plain DEPOSIT. By transaction reference.
+   */
+  private async exportClassifications(
+    accountId: string,
+  ): Promise<
+    Map<string, Pick<NewLedgerEntry, 'kind' | 'sourceType' | 'note'>>
+  > {
+    const rows = await this.db
+      .select({
+        externalId: exportRows.externalId,
+        payload: exportRows.payload,
+      })
+      .from(exportRows)
+      .where(
+        and(
+          eq(exportRows.accountId, accountId),
+          eq(exportRows.action, 'Dividend adjustment'),
+        ),
+      );
+    return new Map(
+      rows
+        .filter((r) => r.externalId)
+        .map((r) => [
+          r.externalId!,
+          {
+            kind: 'DIVIDEND' as const,
+            sourceType: DIVIDEND_ADJUSTMENT,
+            note:
+              r.payload.Notes?.trim() ||
+              'Προσαρμογή παρακράτησης φόρου μερισμάτων',
+          },
+        ]),
+    );
+  }
+
+  /** Applies exportClassifications to entries already in the ledger. Returns how many changed. */
+  async applyExportClassifications(accountId: string): Promise<number> {
+    const classes = await this.exportClassifications(accountId);
+    let changed = 0;
+    for (const [reference, values] of classes) {
+      const result = await this.db.execute(sql`
+        update ${ledgerEntries} le
+           set kind = ${values.kind}, source_type = ${values.sourceType}, note = ${values.note}
+          from ${rawEvents} r
+         where le.raw_event_id = r.id
+           and le.account_id = ${accountId}
+           and r.source = 'TRANSACTION'
+           and r.external_id = ${reference}
+           and (le.kind, le.source_type, le.note) is distinct from (${values.kind}, ${values.sourceType}, ${values.note})`);
+      changed += result.rowCount ?? 0;
+    }
+    return changed;
+  }
+
   private async toLedgerRows(
     accountId: string,
     raws: RawEvent[],
   ): Promise<NewLedgerEntry[]> {
+    const classes = await this.exportClassifications(accountId);
     const rows: NewLedgerEntry[] = [];
     for (const raw of raws) {
       const normalized = normalizeRaw(raw.source, raw.payload);
-      if (normalized)
-        rows.push({ ...normalized, accountId, rawEventId: raw.id });
+      if (!normalized) continue;
+      const override =
+        raw.source === 'TRANSACTION' ? classes.get(raw.externalId) : undefined;
+      rows.push({ ...normalized, ...override, accountId, rawEventId: raw.id });
     }
     const names = await this.instruments.displayTickers(
       rows.map((r) => r.ticker ?? ''),
@@ -283,7 +349,28 @@ export class LedgerService {
     const entries = await this.list(accountId);
     return {
       ...computeCostBasis(entries, method),
-      dividends: estimateDividends(entries, accountCurrency),
+      dividends: dividendDetails(
+        entries,
+        accountCurrency,
+        await this.dividendExportRows(accountId),
+      ),
     };
+  }
+
+  /** Dividend rows of Trading 212's CSV export: the exact tax withheld from each. */
+  async dividendExportRows(accountId: string): Promise<DividendExportRow[]> {
+    return this.db
+      .select({
+        occurredAt: exportRows.occurredAt,
+        action: exportRows.action,
+        payload: exportRows.payload,
+      })
+      .from(exportRows)
+      .where(
+        and(
+          eq(exportRows.accountId, accountId),
+          ilike(exportRows.action, 'dividend%'),
+        ),
+      );
   }
 }

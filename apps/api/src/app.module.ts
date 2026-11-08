@@ -16,6 +16,7 @@ import { oidcCallbackUrl, validateEnv, type Env } from './config/env.js';
 import { EncryptionService } from './crypto/encryption.service.js';
 import * as schema from './db/schema.js';
 import { ExportService } from './export/export.service.js';
+import { ExportsService } from './exports/exports.service.js';
 import { HealthController } from './health/health.controller.js';
 import { LedgerService } from './ledger/ledger.service.js';
 import { PortfolioService } from './portfolio/portfolio.service.js';
@@ -96,6 +97,7 @@ import { UsersService } from './users/users.service.js';
     LedgerService,
     InstrumentsService,
     ExportService,
+    ExportsService,
     PortfolioService,
     ReconciliationService,
     HistorySyncService,

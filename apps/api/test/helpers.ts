@@ -42,7 +42,7 @@ export async function createTestApp(): Promise<TestApp> {
 /** Empties every table, so each test starts from nothing. */
 export async function resetDb(db: Db): Promise<void> {
   await db.execute(
-    sql`truncate users, sessions, oidc_logins, instruments, app_state restart identity cascade`,
+    sql`truncate users, sessions, oidc_logins, export_rows, instruments, app_state restart identity cascade`,
   );
 }
 
@@ -71,7 +71,11 @@ export function as(t: TestApp, cookie: string) {
 export async function seedAccount(
   t: TestApp,
   fake: FakeT212,
-  options: { email?: string; label?: string } = {},
+  options: {
+    email?: string;
+    label?: string;
+    environment?: 'DEMO' | 'LIVE';
+  } = {},
 ): Promise<BrokerAccount> {
   const encryption = t.app.get(EncryptionService);
   const email = options.email ?? TEST_EMAIL;
@@ -85,7 +89,7 @@ export async function seedAccount(
     .values({
       userId: user.id,
       label: options.label ?? 'Test',
-      environment: 'DEMO',
+      environment: options.environment ?? 'DEMO',
       apiKeyEnc: encryption.encrypt('test-key-0000000000'),
       apiSecretEnc: encryption.encrypt('test-secret-0000000000'),
     })

@@ -11,9 +11,11 @@ import { PgBoss } from 'pg-boss';
 import type { Env } from '../config/env.js';
 import type { Db } from '../db/db.js';
 import { brokerAccounts } from '../db/schema.js';
+import { ExportsService } from '../exports/exports.service.js';
 import { HistorySyncService } from './history-sync.service.js';
 
 const QUEUE = 'account-sync';
+const EXPORT_QUEUE = 'account-export';
 /** Job states in which pg-boss will still run the job. */
 const LIVE_STATES = new Set(['created', 'retry', 'active']);
 
@@ -34,6 +36,7 @@ export class SyncQueueService
     config: ConfigService<Env, true>,
     @InjectDrizzle() private readonly db: Db,
     private readonly sync: HistorySyncService,
+    private readonly exports: ExportsService,
   ) {
     this.boss = new PgBoss(config.get('DATABASE_URL', { infer: true }));
     this.boss.on('error', (error) => this.logger.error(error));
@@ -47,8 +50,19 @@ export class SyncQueueService
       expireInSeconds: 4 * 60 * 60,
       retryLimit: 2,
     });
+    // Fetching Trading 212's CSV export takes minutes (it is built on request), so it runs
+    // after the sync, on its own, and never holds the sync up.
+    await this.boss.createQueue(EXPORT_QUEUE, {
+      policy: 'stately',
+      expireInSeconds: 2 * 60 * 60,
+      retryLimit: 1,
+    });
     await this.boss.work<SyncJob>(QUEUE, async ([job]) => {
       await this.sync.run(job.data.accountId, job.data.full, job.signal);
+      await this.enqueueExport(job.data.accountId);
+    });
+    await this.boss.work<{ accountId: string }>(EXPORT_QUEUE, async ([job]) => {
+      await this.exports.run(job.data.accountId, job.signal);
     });
     await this.recoverInterrupted();
     this.started = true;
@@ -92,20 +106,31 @@ export class SyncQueueService
   }
 
   /**
-   * Cancels the account's queued and retrying syncs (an account being deleted). A sync
-   * already running stops on its own: its writes fail once the account is gone, and a
-   * retry finds no account.
+   * Cancels the account's queued and retrying syncs and exports (an account being
+   * deleted). A job already running stops on its own: its writes fail once the account
+   * is gone, and a retry finds no account.
    */
   async cancel(accountId: string): Promise<void> {
-    const jobs = await this.boss.findJobs<SyncJob>(QUEUE, { key: accountId });
-    const pending = jobs.filter(
-      (j) => j.state === 'created' || j.state === 'retry',
-    );
-    if (pending.length)
-      await this.boss.cancel(
-        QUEUE,
-        pending.map((j) => j.id),
+    for (const queue of [QUEUE, EXPORT_QUEUE]) {
+      const jobs = await this.boss.findJobs(queue, { key: accountId });
+      const pending = jobs.filter(
+        (j) => j.state === 'created' || j.state === 'retry',
       );
+      if (pending.length)
+        await this.boss.cancel(
+          queue,
+          pending.map((j) => j.id),
+        );
+    }
+  }
+
+  /** Queues an export run for the account, unless one is already queued. */
+  async enqueueExport(accountId: string): Promise<void> {
+    await this.boss.send(
+      EXPORT_QUEUE,
+      { accountId },
+      { singletonKey: accountId, heartbeatSeconds: 60 },
+    );
   }
 
   /** Returns false when a sync for this account is already queued. */

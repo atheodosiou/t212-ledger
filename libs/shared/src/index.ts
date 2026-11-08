@@ -46,7 +46,34 @@ export interface AccountDto {
   syncError: string | null;
   lastSyncedAt: string | null;
   reconciliation: ReconciliationDto | null;
+  exportState: ExportStateDto | null;
+  exportCheck: ExportCheckDto | null;
   createdAt: string;
+}
+
+/** Which years of Trading 212's CSV export the app holds, and whether it can fetch them. */
+export interface ExportStateDto {
+  years: Record<string, { coveredTo: string; fetchedAt: string; rows: number }>;
+  running?: { year: number; reportId: number | null; since: string } | null;
+  blocked?: { reason: 'demo' | 'permission' | 'error'; message: string; at: string } | null;
+}
+
+export interface ExportDifferenceDto {
+  kind: 'missing-from-api' | 'missing-from-export' | 'mismatch';
+  date: string;
+  what: string;
+  detail: string;
+}
+
+/** Line-by-line comparison of the API history with Trading 212's CSV export. */
+export interface ExportCheckDto {
+  checkedAt: string;
+  from: string;
+  to: string;
+  ok: boolean;
+  compared: { orders: number; dividends: number; cash: number };
+  differences: ExportDifferenceDto[];
+  truncated: number;
 }
 
 export interface CreateAccountRequest {
@@ -103,11 +130,15 @@ export interface HoldingDto {
 
 export interface YearSummaryDto {
   year: number;
+  /** Credited, as Trading 212 reports it (after deposit fees). */
   deposits: string;
+  depositFees: string;
   withdrawals: string;
   purchases: string;
   saleProceeds: string;
   realisedPnl: string;
+  /** Trading 212's own result of the sales (FX fees not deducted). */
+  brokerRealisedPnl: string;
   dividends: string;
   interest: string;
   fees: string;
@@ -171,9 +202,15 @@ export interface DividendDetailDto {
   net: string;
   fxRate: string | null;
   grossAccount: string | null;
+  /** Negative for a refund of withheld tax. */
   withheld: string | null;
+  /** As Trading 212 states it, in its currency (from its export). */
+  withheldOriginal: string | null;
+  withheldCurrency: string | null;
   withholdingRate: string | null;
+  source: 'export' | 'api' | 'estimate' | 'adjustment';
   estimated: boolean;
+  note: string | null;
 }
 
 export interface ReportDto {

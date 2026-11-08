@@ -48,16 +48,43 @@ export interface Holding {
 }
 
 type Totals = {
+  /** Amounts credited to the account, as Trading 212 reports them (after deposit fees). */
   deposits: string;
+  /** Fees on card deposits (Trading 212's "Deposit fee"), positive. */
+  depositFees: string;
   withdrawals: string;
   purchases: string;
   saleProceeds: string;
   realisedPnl: string;
+  /** Trading 212's own realised result of the sales (fees not deducted). */
+  brokerRealisedPnl: string;
   dividends: string;
   interest: string;
-  /** Trading fees (inside BUY/SELL) plus standalone FEE transactions. */
+  /** Trading fees (inside BUY/SELL) plus standalone fees other than deposit fees. */
   fees: string;
 };
+
+/**
+ * Deposit fees: the API sends a card deposit as the amount charged (DEPOSIT, e.g.
+ * 1007) and the fee (FEE, -7) at the same instant, where Trading 212 itself reports a
+ * deposit of 1000 with a deposit fee of 7. Returns the ids of those FEE entries.
+ */
+export function depositFeeIds(
+  entries: { id: string; kind: string; occurredAt: Date }[],
+): Set<string> {
+  const depositTimes = new Set(
+    entries
+      .filter((e) => e.kind === 'DEPOSIT')
+      .map((e) => e.occurredAt.getTime()),
+  );
+  return new Set(
+    entries
+      .filter(
+        (e) => e.kind === 'FEE' && depositTimes.has(e.occurredAt.getTime()),
+      )
+      .map((e) => e.id),
+  );
+}
 
 export interface YearSummary extends Totals {
   year: number;
@@ -127,10 +154,12 @@ const EPS = new Decimal('1e-9');
 
 const emptyTotals = (): Totals => ({
   deposits: '0',
+  depositFees: '0',
   withdrawals: '0',
   purchases: '0',
   saleProceeds: '0',
   realisedPnl: '0',
+  brokerRealisedPnl: '0',
   dividends: '0',
   interest: '0',
   fees: '0',
@@ -152,6 +181,7 @@ export function computeCostBasis(
   const sorted = [...entries].sort(
     (a, b) => a.occurredAt.getTime() - b.occurredAt.getTime(),
   );
+  const depositFees = depositFeeIds(sorted);
   const positions = new Map<string, Position>();
   const sales: RealisedSale[] = [];
   const warnings: EngineWarning[] = [];
@@ -222,7 +252,11 @@ export function computeCostBasis(
         add(year, 'dividends', cash);
         break;
       case 'FEE':
-        add(year, 'fees', fees);
+        if (depositFees.has(entry.id)) {
+          // Report the deposit net, as Trading 212 does, and its fee apart.
+          add(year, 'deposits', cash);
+          add(year, 'depositFees', cash.abs());
+        } else add(year, 'fees', fees);
         break;
       case 'BUY': {
         const pos = position(positions, entry);
@@ -272,6 +306,8 @@ export function computeCostBasis(
         });
         add(year, 'saleProceeds', proceeds);
         add(year, 'realisedPnl', pnl);
+        if (entry.brokerRealisedPnl !== null)
+          add(year, 'brokerRealisedPnl', new Decimal(entry.brokerRealisedPnl));
         add(year, 'fees', fees);
         record(entry, pos, quantity.neg(), pnl);
         break;

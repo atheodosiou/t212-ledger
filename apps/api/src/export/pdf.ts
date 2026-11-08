@@ -9,6 +9,7 @@ import type {
 import {
   DISCLAIMER,
   displayTicker,
+  dividendTaxLine,
   DIVIDENDS_NOTE,
   FEES_NOTE,
   formatDate,
@@ -16,6 +17,7 @@ import {
   KIND_LABEL,
   METHOD_LABEL,
   type ReportData,
+  WITHHOLDING_SOURCE_LABEL,
 } from './report-data.js';
 
 const fontDir = join(
@@ -110,10 +112,12 @@ export async function buildPdf(data: ReportData): Promise<Buffer> {
     [
       'Έτος',
       'Καταθέσεις',
+      'Χρεώσεις κατάθεσης',
       'Αναλήψεις',
       'Αγορές',
       'Έσοδα πωλήσεων',
       'Αποτέλεσμα πωλήσεων',
+      'Αποτέλεσμα κατά Trading 212',
       'Μερίσματα',
       'Τόκοι',
       'Χρεώσεις',
@@ -126,10 +130,12 @@ export async function buildPdf(data: ReportData): Promise<Buffer> {
       String(y.year),
       ...[
         y.deposits,
+        y.depositFees,
         y.withdrawals,
         y.purchases,
         y.saleProceeds,
         y.realisedPnl,
+        y.brokerRealisedPnl,
         y.dividends,
         y.interest,
         y.fees,
@@ -142,10 +148,12 @@ export async function buildPdf(data: ReportData): Promise<Buffer> {
       { text: 'Σύνολο', bold: true },
       ...[
         t.deposits,
+        t.depositFees,
         t.withdrawals,
         t.purchases,
         t.saleProceeds,
         t.realisedPnl,
+        t.brokerRealisedPnl,
         t.dividends,
         t.interest,
         t.fees,
@@ -187,7 +195,7 @@ export async function buildPdf(data: ReportData): Promise<Buffer> {
     {
       table: {
         headerRows: 1,
-        widths: [40, '*', '*', '*', '*', '*', '*', '*', '*'],
+        widths: [36, '*', '*', '*', '*', '*', '*', '*', '*', '*', '*'],
         body: summaryRows,
       },
       layout: 'lightHorizontalLines',
@@ -197,7 +205,7 @@ export async function buildPdf(data: ReportData): Promise<Buffer> {
       .map(([year, t]): Content => ({
         text: [
           { text: `Μερίσματα ${year}: `, bold: true },
-          `μικτά ~${money(t.gross)}, φόρος που παρακρατήθηκε στο εξωτερικό ~${money(t.withheld)} (εκτίμηση${t.partial ? ', ελλιπής' : ''}).`,
+          dividendTaxLine(t, money),
         ],
         style: 'note',
         margin: [0, 10, 0, 0],
@@ -318,7 +326,11 @@ export async function buildPdf(data: ReportData): Promise<Buffer> {
         },
         { header: 'Ticker', width: 40, value: (d) => displayTicker(d.ticker) },
         { header: 'ISIN', width: 74, value: (d) => d.isin ?? '' },
-        { header: 'Τίτλος', width: '*', value: (d) => d.instrumentName ?? '' },
+        {
+          header: 'Τίτλος',
+          width: '*',
+          value: (d) => d.instrumentName ?? d.note ?? '',
+        },
         {
           header: 'Μικτό (τίτλου)',
           width: 64,
@@ -329,14 +341,14 @@ export async function buildPdf(data: ReportData): Promise<Buffer> {
               : '',
         },
         {
-          header: 'Μικτό € (εκτ.)',
+          header: 'Μικτό €',
           width: 58,
           align: 'right',
           value: (d) => money(d.grossAccount),
           total: (r) => sum(r, (d) => d.grossAccount),
         },
         {
-          header: 'Φόρος (εκτ.)',
+          header: 'Φόρος €',
           width: 54,
           align: 'right',
           value: (d) => money(d.withheld),
@@ -347,6 +359,11 @@ export async function buildPdf(data: ReportData): Promise<Buffer> {
           width: 30,
           align: 'right',
           value: (d) => (d.withholdingRate ? `${d.withholdingRate}` : ''),
+        },
+        {
+          header: 'Πηγή φόρου',
+          width: 50,
+          value: (d) => WITHHOLDING_SOURCE_LABEL[d.source],
         },
         {
           header: 'Καθαρό',

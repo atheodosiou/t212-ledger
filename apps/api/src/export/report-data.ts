@@ -10,7 +10,11 @@ import {
   type RealisedSale,
   type YearSummary,
 } from '../ledger/cost-basis.js';
-import { estimateDividends, type DividendDetail } from '../ledger/dividends.js';
+import {
+  dividendDetails,
+  type DividendDetail,
+  type DividendExportRow,
+} from '../ledger/dividends.js';
 import type { LedgerKind } from '../ledger/normalize.js';
 
 /** A ledger row as the export needs it. Numeric fields are decimal strings. */
@@ -43,11 +47,8 @@ export interface ReportData {
   sales: RealisedSale[];
   buys: ExportLedgerEntry[];
   dividends: DividendDetail[];
-  /** Estimated gross dividends and tax withheld abroad, per year shown. */
-  dividendTax: Map<
-    number,
-    { gross: string; withheld: string; partial: boolean }
-  >;
+  /** Gross dividends and tax withheld abroad, per year shown. */
+  dividendTax: Map<number, DividendTaxYear>;
   cashMovements: ExportLedgerEntry[];
   corporateActions: ExportLedgerEntry[];
   /** Holdings at the end of the selected year, or now for the whole history / the running year. */
@@ -55,6 +56,15 @@ export interface ReportData {
   closingHoldingsTitle: string;
   entries: ExportLedgerEntry[];
   warnings: EngineWarning[];
+}
+
+export interface DividendTaxYear {
+  gross: string;
+  withheld: string;
+  /** Some dividends could not be converted, so the totals understate the tax. */
+  partial: boolean;
+  /** Some figures are estimates (no export row for them). */
+  estimated: boolean;
 }
 
 const CASH_KINDS: LedgerKind[] = [
@@ -66,10 +76,12 @@ const CASH_KINDS: LedgerKind[] = [
 ];
 const TOTAL_FIELDS = [
   'deposits',
+  'depositFees',
   'withdrawals',
   'purchases',
   'saleProceeds',
   'realisedPnl',
+  'brokerRealisedPnl',
   'dividends',
   'interest',
   'fees',
@@ -83,6 +95,8 @@ export function buildReportData(
   allEntries: ExportLedgerEntry[],
   meta: Omit<ExportMeta, 'firstActivity' | 'lastActivity' | 'timeZone'> & {
     timeZone?: string;
+    /** Dividend rows of Trading 212's CSV export: the exact tax withheld. */
+    dividendExportRows?: DividendExportRow[];
   },
 ): ReportData {
   const timeZone = meta.timeZone ?? DEFAULT_TAX_TIME_ZONE;
@@ -102,26 +116,26 @@ export function buildReportData(
     TOTAL_FIELDS.map((field) => [field, sumMoney(years.map((y) => y[field]))]),
   ) as ReportData['totals'];
 
-  const dividends = estimateDividends(allEntries, meta.currency).filter((d) =>
-    inRange(d.date),
-  );
-  const dividendTax = new Map<
-    number,
-    { gross: string; withheld: string; partial: boolean }
-  >();
+  const dividends = dividendDetails(
+    allEntries,
+    meta.currency,
+    meta.dividendExportRows ?? [],
+  ).filter((d) => inRange(d.date));
+  const dividendTax = new Map<number, DividendTaxYear>();
   for (const y of years) {
     const inYear = dividends.filter((d) => yearOf(d.date) === y.year);
     dividendTax.set(y.year, {
       gross: sumMoney(inYear.map((d) => d.grossAccount ?? d.net)),
       withheld: sumMoney(inYear.map((d) => d.withheld ?? '0')),
-      // Some dividends could not be converted, so the totals understate the tax.
       partial: inYear.some((d) => d.withheld === null),
+      estimated: inYear.some((d) => d.source === 'estimate'),
     });
   }
 
+  const { dividendExportRows: _rows, ...shownMeta } = meta;
   return {
     meta: {
-      ...meta,
+      ...shownMeta,
       timeZone,
       firstActivity: allEntries.length
         ? new Date(Math.min(...allEntries.map((e) => e.occurredAt.getTime())))
@@ -202,14 +216,38 @@ export function formatDateTime(date: Date, timeZone: string): string {
 }
 
 export const FEES_NOTE =
-  'Τα ποσά αγορών περιλαμβάνουν τις χρεώσεις (π.χ. μετατροπή νομίσματος) και τα ποσά πωλήσεων είναι μετά τις χρεώσεις. ' +
-  'Γι’ αυτό το αποτέλεσμα διαφέρει από το «Realised P&L» του Trading 212, που δεν τις συνυπολογίζει.';
+  'Τα ποσά αγορών περιλαμβάνουν τις χρεώσεις μετατροπής νομίσματος και τα ποσά πωλήσεων είναι μετά από αυτές, οπότε το «Αποτέλεσμα πωλήσεων» τις αφαιρεί. ' +
+  'Το «Αποτέλεσμα κατά Trading 212» είναι το «Result» του Trading 212 για κάθε πώληση, που δεν τις αφαιρεί· η διαφορά των δύο είναι μόνο αυτές οι χρεώσεις. ' +
+  'Οι καταθέσεις είναι τα ποσά που πιστώθηκαν, όπως τα δείχνει το Trading 212· οι χρεώσεις κατάθεσης με κάρτα εμφανίζονται χωριστά.';
 
 export const DIVIDENDS_NOTE =
-  'Το Trading 212 δίνει το καθαρό μέρισμα σε ευρώ και το μικτό στο νόμισμα του τίτλου, όχι τον φόρο που παρακρατήθηκε. ' +
-  'Το μικτό σε ευρώ και ο φόρος εξωτερικού είναι εκτίμηση, με την ισοτιμία της πλησιέστερης συναλλαγής στο ίδιο νόμισμα. ' +
-  'Για πολύ μικρά ποσά το ποσοστό είναι ανακριβές λόγω στρογγυλοποίησης του καθαρού σε λεπτά.';
+  'Ο φόρος που παρακρατήθηκε στο εξωτερικό είναι αυτός που αναφέρει το Trading 212 στο export του λογαριασμού (πηγή «Trading 212»), μετατρεμμένος σε ευρώ με την ισοτιμία του ίδιου του μερίσματος. ' +
+  'Όπου δεν υπάρχει ακόμα export, είναι εκτίμηση (πηγή «Εκτίμηση»): μικτό μείον καθαρό, με την ισοτιμία της πλησιέστερης συναλλαγής στο ίδιο νόμισμα. ' +
+  'Οι επιστροφές παρακρατημένου φόρου εμφανίζονται ως αρνητικός φόρος, με την περιγραφή του Trading 212.';
+
+/** Where a dividend's tax figure comes from, for the reports. */
+export const WITHHOLDING_SOURCE_LABEL: Record<
+  DividendDetail['source'],
+  string
+> = {
+  export: 'Trading 212',
+  api: 'Trading 212 (API)',
+  estimate: 'Εκτίμηση',
+  adjustment: 'Επιστροφή/διόρθωση',
+};
+
+/** One line per year: gross dividends and the tax withheld, and how sure that is. */
+export function dividendTaxLine(
+  t: DividendTaxYear,
+  money: (v: string) => string,
+): string {
+  const approx = t.estimated ? '~' : '';
+  const source = t.estimated
+    ? `εκτίμηση${t.partial ? ', ελλιπής' : ''}`
+    : 'από το export του Trading 212';
+  return `μικτά ${approx}${money(t.gross)}, φόρος που παρακρατήθηκε στο εξωτερικό ${approx}${money(t.withheld)} (${source}).`;
+}
 
 export const DISCLAIMER =
-  'Η αναφορά παράγεται αυτόματα από τα δεδομένα του Trading 212 API και δεν αποτελεί φορολογική συμβουλή. ' +
+  'Η αναφορά παράγεται αυτόματα από τα δεδομένα του Trading 212 (API και export του λογαριασμού) και δεν αποτελεί φορολογική συμβουλή. ' +
   'Η φορολογική μεταχείριση κάθε ποσού πρέπει να επιβεβαιωθεί από λογιστή.';

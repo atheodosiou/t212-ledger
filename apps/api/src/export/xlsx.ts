@@ -9,6 +9,7 @@ import {
   KIND_LABEL,
   METHOD_LABEL,
   type ReportData,
+  WITHHOLDING_SOURCE_LABEL,
 } from './report-data.js';
 
 type ColumnType = 'text' | 'date' | 'money' | 'qty' | 'price';
@@ -157,6 +158,13 @@ export async function buildXlsx(data: ReportData): Promise<Buffer> {
         total: true,
       },
       {
+        header: 'Χρεώσεις κατάθεσης',
+        width: 13,
+        type: 'money',
+        value: (y) => num(y.depositFees),
+        total: true,
+      },
+      {
         header: 'Αναλήψεις',
         width: 15,
         type: 'money',
@@ -178,10 +186,17 @@ export async function buildXlsx(data: ReportData): Promise<Buffer> {
         total: true,
       },
       {
-        header: 'Αποτέλεσμα πωλήσεων',
+        header: 'Αποτέλεσμα πωλήσεων (με χρεώσεις)',
         width: 18,
         type: 'money',
         value: (y) => num(y.realisedPnl),
+        total: true,
+      },
+      {
+        header: 'Αποτέλεσμα κατά Trading 212',
+        width: 18,
+        type: 'money',
+        value: (y) => num(y.brokerRealisedPnl),
         total: true,
       },
       {
@@ -192,14 +207,14 @@ export async function buildXlsx(data: ReportData): Promise<Buffer> {
         total: true,
       },
       {
-        header: 'Μερίσματα μικτά (εκτίμηση)',
+        header: 'Μερίσματα μικτά',
         width: 16,
         type: 'money',
         value: (y) => num(data.dividendTax.get(y.year)?.gross ?? null),
         total: true,
       },
       {
-        header: 'Φόρος εξωτερικού (εκτίμηση)',
+        header: 'Φόρος εξωτερικού',
         width: 16,
         type: 'money',
         value: (y) => num(data.dividendTax.get(y.year)?.withheld ?? null),
@@ -400,7 +415,7 @@ export async function buildXlsx(data: ReportData): Promise<Buffer> {
         header: 'Τίτλος',
         width: 28,
         type: 'text',
-        value: (d) => d.instrumentName,
+        value: (d) => d.instrumentName ?? d.note,
       },
       {
         header: 'Μετοχές',
@@ -427,14 +442,14 @@ export async function buildXlsx(data: ReportData): Promise<Buffer> {
         value: (d) => num(d.fxRate),
       },
       {
-        header: 'Μικτό σε € (εκτίμηση)',
+        header: 'Μικτό σε €',
         width: 14,
         type: 'money',
         value: (d) => num(d.grossAccount),
         total: true,
       },
       {
-        header: 'Φόρος εξωτερικού (εκτίμηση)',
+        header: 'Φόρος εξωτερικού σε €',
         width: 14,
         type: 'money',
         value: (d) => num(d.withheld),
@@ -445,6 +460,24 @@ export async function buildXlsx(data: ReportData): Promise<Buffer> {
         width: 9,
         type: 'price',
         value: (d) => num(d.withholdingRate),
+      },
+      {
+        header: 'Φόρος (Trading 212)',
+        width: 12,
+        type: 'price',
+        value: (d) => num(d.withheldOriginal),
+      },
+      {
+        header: 'Νόμισμα φόρου',
+        width: 8,
+        type: 'text',
+        value: (d) => d.withheldCurrency,
+      },
+      {
+        header: 'Πηγή φόρου',
+        width: 16,
+        type: 'text',
+        value: (d) => WITHHOLDING_SOURCE_LABEL[d.source],
       },
       {
         header: 'Καθαρό που πιστώθηκε',
@@ -459,7 +492,7 @@ export async function buildXlsx(data: ReportData): Promise<Buffer> {
   if (data.dividends.length) {
     const ws = wb.getWorksheet('Μερίσματα')!;
     const r = 4 + data.dividends.length + 2;
-    ws.mergeCells(`A${r}:L${r}`);
+    ws.mergeCells(`A${r}:O${r}`);
     ws.getCell(`A${r}`).value = DIVIDENDS_NOTE;
     ws.getCell(`A${r}`).alignment = { wrapText: true, vertical: 'top' };
     ws.getCell(`A${r}`).font = { italic: true, color: { argb: 'FF4B5563' } };
