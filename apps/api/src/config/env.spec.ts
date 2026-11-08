@@ -10,26 +10,6 @@ describe('validateEnv', () => {
     expect(validateEnv(base).HOST).toBe('127.0.0.1');
   });
 
-  it('refuses a network address with the development sign-in', () => {
-    expect(() =>
-      validateEnv({
-        ...base,
-        DEV_USER_EMAIL: 'dev@localhost.test',
-        HOST: '0.0.0.0',
-      }),
-    ).toThrow(/HOST must be a loopback address/);
-  });
-
-  it('allows loopback with the development sign-in', () => {
-    expect(
-      validateEnv({
-        ...base,
-        DEV_USER_EMAIL: 'dev@localhost.test',
-        HOST: '::1',
-      }).HOST,
-    ).toBe('::1');
-  });
-
   it('rejects a key that is not 32 bytes', () => {
     expect(() =>
       validateEnv({ ...base, CREDENTIAL_ENCRYPTION_KEY: 'short' }),
@@ -46,12 +26,6 @@ describe('validateEnv', () => {
 
   it('accepts a complete production setup', () => {
     expect(validateEnv(production).NODE_ENV).toBe('production');
-  });
-
-  it('refuses the development sign-in in production', () => {
-    expect(() =>
-      validateEnv({ ...production, DEV_USER_EMAIL: 'dev@localhost.test' }),
-    ).toThrow(/not allowed in production/);
   });
 
   it('requires Google sign-in and https in production', () => {
@@ -72,11 +46,9 @@ describe('validateEnv', () => {
       ...base,
       GOOGLE_CLIENT_ID: '',
       GOOGLE_CLIENT_SECRET: '',
-      DEV_USER_EMAIL: '',
       CREDENTIAL_ENCRYPTION_KEYS_OLD: '',
     });
     expect(env.GOOGLE_CLIENT_ID).toBeUndefined();
-    expect(env.DEV_USER_EMAIL).toBeUndefined();
     expect(env.CREDENTIAL_ENCRYPTION_KEYS_OLD).toEqual([]);
   });
 

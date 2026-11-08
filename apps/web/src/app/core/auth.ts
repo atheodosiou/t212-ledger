@@ -47,12 +47,6 @@ export class Auth {
     await firstValueFrom(this.http.post<void>('/api/auth/logout-everywhere', {}));
     this.signedOut();
   }
-
-  async devLogin(): Promise<void> {
-    await firstValueFrom(this.http.post<void>('/api/auth/dev-login', {}));
-    this.user.set(undefined);
-    await this.check();
-  }
 }
 
 /** Pages that need a signed-in user. */

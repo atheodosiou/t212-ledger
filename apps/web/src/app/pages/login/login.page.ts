@@ -1,9 +1,7 @@
 import { httpResource } from '@angular/common/http';
-import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from '@angular/core';
-import { Router, RouterLink } from '@angular/router';
+import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import type { AuthConfigDto } from '@t212/shared';
-import { Auth } from '../../core/auth';
-import { apiErrorMessage } from '../../core/format';
 
 const ERRORS: Record<string, string> = {
   'unverified-email': 'Η Google δεν επιβεβαίωσε τη διεύθυνση email αυτού του λογαριασμού.',
@@ -57,16 +55,10 @@ const ERRORS: Record<string, string> = {
               </svg>
               Σύνδεση με Google
             </a>
-          }
-          @if (config.value()?.devUser; as dev) {
-            <button
-              type="button"
-              (click)="devLogin()"
-              [disabled]="busy()"
-              class="h-11 rounded-lg border border-dashed border-amber-400 bg-amber-50 text-sm font-medium text-amber-900 transition hover:bg-amber-100 disabled:opacity-50"
-            >
-              Σύνδεση ως {{ dev }} <span class="text-xs">(μόνο για ανάπτυξη)</span>
-            </button>
+          } @else {
+            <p class="text-sm text-loss">
+              Η σύνδεση δεν είναι διαθέσιμη: ο server δεν έχει ρυθμιστεί για σύνδεση με Google.
+            </p>
           }
         }
       </div>
@@ -78,20 +70,15 @@ const ERRORS: Record<string, string> = {
   `,
 })
 export class LoginPage {
-  private readonly auth = inject(Auth);
-  private readonly router = inject(Router);
-
   /** Query parameters. */
   readonly error = input<string>();
   readonly redirectTo = input<string>();
 
   protected readonly config = httpResource<AuthConfigDto>(() => '/api/auth/config');
-  protected readonly busy = signal(false);
-  private readonly devError = signal<string | null>(null);
 
   protected readonly message = computed(() => {
     const code = this.error();
-    return this.devError() ?? (code ? (ERRORS[code] ?? ERRORS['failed']) : null);
+    return code ? (ERRORS[code] ?? ERRORS['failed']) : null;
   });
 
   /** Only a path inside the app, never another site. */
@@ -103,17 +90,4 @@ export class LoginPage {
   protected readonly googleUrl = computed(
     () => `/api/auth/oidc/google/login?redirectTo=${encodeURIComponent(this.target())}`,
   );
-
-  protected async devLogin(): Promise<void> {
-    this.busy.set(true);
-    this.devError.set(null);
-    try {
-      await this.auth.devLogin();
-      await this.router.navigateByUrl(this.target());
-    } catch (error) {
-      this.devError.set(apiErrorMessage(error));
-    } finally {
-      this.busy.set(false);
-    }
-  }
 }

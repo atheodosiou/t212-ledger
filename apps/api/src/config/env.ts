@@ -1,7 +1,5 @@
 import { z } from 'zod';
 
-const LOOPBACK = ['127.0.0.1', '::1', 'localhost'];
-
 /** 32 bytes, base64-encoded. Generate with: node -e "console.log(require('crypto').randomBytes(32).toString('base64'))" */
 const aesKey = z
   .string()
@@ -40,27 +38,12 @@ const envSchema = z
     /** Google OAuth client ("Web application"). Both or neither. */
     GOOGLE_CLIENT_ID: z.string().min(1).optional(),
     GOOGLE_CLIENT_SECRET: z.string().min(1).optional(),
-    /**
-     * Development only: a "Sign in as …" button for this address, no Google needed.
-     * Refused in production and on a network address.
-     */
-    DEV_USER_EMAIL: z.email().optional(),
     /** Express "trust proxy": `loopback` behind Nginx on the same machine, so rate limits see the real client address. */
     TRUST_PROXY: z.string().optional(),
   })
   .refine((env) => !!env.GOOGLE_CLIENT_ID === !!env.GOOGLE_CLIENT_SECRET, {
     message: 'Set both GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET, or neither',
     path: ['GOOGLE_CLIENT_SECRET'],
-  })
-  .refine((env) => !(env.DEV_USER_EMAIL && env.NODE_ENV === 'production'), {
-    message:
-      'DEV_USER_EMAIL signs anyone in without a password: not allowed in production',
-    path: ['DEV_USER_EMAIL'],
-  })
-  .refine((env) => !env.DEV_USER_EMAIL || LOOPBACK.includes(env.HOST), {
-    message:
-      'HOST must be a loopback address while DEV_USER_EMAIL is set: anyone who can reach the API could sign in as that user.',
-    path: ['HOST'],
   })
   .refine((env) => env.NODE_ENV !== 'production' || !!env.GOOGLE_CLIENT_ID, {
     message:

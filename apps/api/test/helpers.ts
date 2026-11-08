@@ -13,6 +13,9 @@ import { brokerAccounts, users, type BrokerAccount } from '../src/db/schema.js';
 import { SyncQueueService } from '../src/sync/sync-queue.service.js';
 import type { FakeT212 } from './fake-t212.js';
 
+/** The user the tests act as, unless they say otherwise. */
+export const TEST_EMAIL = 'e2e@localhost.test';
+
 export interface TestApp {
   app: INestApplication;
   db: Db;
@@ -44,10 +47,7 @@ export async function resetDb(db: Db): Promise<void> {
 }
 
 /** Creates (or finds) a user and signs them in; returns the Cookie header value. */
-export async function signIn(
-  t: TestApp,
-  email = process.env.DEV_USER_EMAIL!,
-): Promise<string> {
+export async function signIn(t: TestApp, email = TEST_EMAIL): Promise<string> {
   const [user] = await t.db
     .insert(users)
     .values({ email })
@@ -74,7 +74,7 @@ export async function seedAccount(
   options: { email?: string; label?: string } = {},
 ): Promise<BrokerAccount> {
   const encryption = t.app.get(EncryptionService);
-  const email = options.email ?? process.env.DEV_USER_EMAIL!;
+  const email = options.email ?? TEST_EMAIL;
   const [user] = await t.db
     .insert(users)
     .values({ email })

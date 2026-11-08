@@ -29,9 +29,9 @@ npm run build:shared
 npm run dev:web                    # http://localhost:4200, proxies /api to :3000
 ```
 
-Sign in at http://localhost:4200 with the `DEV_USER_EMAIL` button (development only), or with Google once
-`GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are set (redirect URI
-`http://localhost:4200/api/auth/oidc/google/callback`).
+Sign in at http://localhost:4200 with Google. Locally, too, this needs `GOOGLE_CLIENT_ID` and
+`GOOGLE_CLIENT_SECRET` in `apps/api/.env`, and the redirect URI
+`http://localhost:4200/api/auth/oidc/google/callback` registered with the Google client.
 
 ## Sign-in and users
 
@@ -123,8 +123,8 @@ Browser ── https://ledger.theodosiou.me ──▶ Nginx (Contabo VPS)
 ## Safety
 
 - The API listens on 127.0.0.1 only (`HOST`).
-- The development sign-in (`DEV_USER_EMAIL`) is refused on any other address and in production.
-- Production also requires Google sign-in and an https `WEB_ORIGIN`.
+- Google is the only way to sign in; there is no development shortcut. Production refuses to start without the
+  Google client or with a non-https `WEB_ORIGIN`.
 - The database port is published on 127.0.0.1 only in development, and not at all in production.
 - Syncs survive crashes: jobs send a heartbeat, so a sync whose process died is retried within about a minute and
   resumes where it stopped. On start-up the API also re-queues any account left marked as syncing with no job.
@@ -161,7 +161,7 @@ Browser ── https://ledger.theodosiou.me ──▶ Nginx (Contabo VPS)
 
 | Method | Path | |
 |---|---|---|
-| GET | `/api/auth/config` | public: `{ google, devUser }` |
+| GET | `/api/auth/config` | public: `{ google }` |
 | GET | `/api/auth/oidc/google/login` | public: `?redirectTo=/path`, redirects to Google |
 | GET | `/api/auth/me` | the signed-in user (401 otherwise) |
 | POST | `/api/auth/logout`, `/api/auth/logout-everywhere` | |

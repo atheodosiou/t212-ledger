@@ -1,5 +1,6 @@
 import {
   AuthenticationStorage,
+  SessionService,
   type OidcProfile,
 } from '@nestjs/authentication';
 import { authenticationStoreContract } from '@nestjs/authentication/testing';
@@ -26,6 +27,7 @@ import {
   resetDb,
   seedAccount,
   signIn,
+  TEST_EMAIL,
   type TestApp,
 } from './helpers.js';
 
@@ -67,21 +69,25 @@ describe('Sign-in, sessions and personal data', () => {
       await anonymous().get('/api/me/export').expect(401);
       await anonymous().get('/api/health').expect(200);
       const config = await anonymous().get('/api/auth/config').expect(200);
-      expect(config.body).toEqual({
-        google: false,
-        devUser: 'e2e@localhost.test',
-      });
+      expect(config.body).toEqual({ google: false });
+      // The development sign-in is gone for good.
+      await anonymous().post('/api/auth/dev-login').expect(404);
     });
 
-    it('signs in with the development user, and out again', async () => {
-      const login = await anonymous().post('/api/auth/dev-login').expect(204);
-      const setCookie = String(login.headers['set-cookie']);
-      expect(setCookie).toMatch(/__Host-sid=/);
-      expect(setCookie).toMatch(/HttpOnly/i);
-      expect(setCookie).toMatch(/Secure/i);
-      expect(setCookie).toMatch(/SameSite=Lax/i);
-      const cookie = setCookie.split(';')[0];
+    it('issues a hardened session cookie', async () => {
+      const [user] = await t.db
+        .insert(users)
+        .values({ email: TEST_EMAIL })
+        .returning();
+      const { cookie } = await t.app.get(SessionService).create(user.id);
+      expect(cookie).toMatch(/^__Host-sid=/);
+      expect(cookie).toMatch(/HttpOnly/i);
+      expect(cookie).toMatch(/Secure/i);
+      expect(cookie).toMatch(/SameSite=Lax/i);
+    });
 
+    it('signs out', async () => {
+      const cookie = await signIn(t);
       const me = await as(t, cookie).get('/api/auth/me').expect(200);
       expect(me.body).toMatchObject({ email: 'e2e@localhost.test' });
       expect(await count(t, 'sessions')).toBe(1);

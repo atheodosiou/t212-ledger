@@ -245,6 +245,4 @@ export interface UserDto {
 /** Sign-in methods the server offers. */
 export interface AuthConfigDto {
   google: boolean;
-  /** Development only: the address of the "Sign in as" button. */
-  devUser: string | null;
 }

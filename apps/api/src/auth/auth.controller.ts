@@ -3,7 +3,6 @@ import {
   Get,
   HttpCode,
   Logger,
-  NotFoundException,
   Param,
   Post,
   Query,
@@ -21,14 +20,12 @@ import { ConfigService } from '@nestjs/config';
 import { Throttle } from '@nestjs/throttler';
 import type { Response } from 'express';
 import type { Env } from '../config/env.js';
-import { SignInRefusedError, UsersService } from '../users/users.service.js';
+import { SignInRefusedError } from '../users/users.service.js';
 import type { AppUser } from './auth.types.js';
 
 /** Sign-in methods the login page offers. */
 export interface AuthConfig {
   google: boolean;
-  /** Set in development only: the address of the "Sign in as" button. */
-  devUser: string | null;
 }
 
 @Controller('auth')
@@ -39,16 +36,12 @@ export class AuthController {
     private readonly config: ConfigService<Env, true>,
     private readonly oidc: OidcService,
     private readonly signIns: SignInService,
-    private readonly users: UsersService,
   ) {}
 
   @Public()
   @Get('config')
   authConfig(): AuthConfig {
-    return {
-      google: !!this.config.get('GOOGLE_CLIENT_ID', { infer: true }),
-      devUser: this.config.get('DEV_USER_EMAIL', { infer: true }) ?? null,
-    };
+    return { google: !!this.config.get('GOOGLE_CLIENT_ID', { infer: true }) };
   }
 
   /** The signed-in user; 401 otherwise (the web app then shows the sign-in page). */
@@ -96,18 +89,6 @@ export class AuthController {
       }
       return { url: `/login?error=${reason}` };
     }
-  }
-
-  /** DEV_USER_EMAIL only (never in production): signs in without Google. */
-  @Public()
-  @Post('dev-login')
-  @HttpCode(204)
-  async devLogin(): Promise<void> {
-    const email = this.config.get('DEV_USER_EMAIL', { infer: true });
-    if (!email || this.config.get('NODE_ENV', { infer: true }) === 'production')
-      throw new NotFoundException();
-    const user = await this.users.devUser(email);
-    await this.signIns.signIn(user.id, { method: 'dev' });
   }
 
   @Authenticate({ optional: true })

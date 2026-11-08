@@ -14,7 +14,6 @@ const env = {
   TEST_DATABASE_ADMIN_URL: admin,
   DATABASE_URL: testDb.toString(),
   CREDENTIAL_ENCRYPTION_KEY: randomBytes(32).toString('base64'),
-  DEV_USER_EMAIL: 'e2e@localhost.test',
   HOST: '127.0.0.1',
 };
 // The global setup runs in this process, the tests in workers: both need the same values.

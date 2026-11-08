@@ -74,20 +74,6 @@ export class UsersService {
     });
   }
 
-  /** Development sign-in (DEV_USER_EMAIL): the user is created on first use. */
-  async devUser(email: string): Promise<AppUser> {
-    const normalized = normalizeEmail(email);
-    const [user] = await this.db
-      .insert(users)
-      .values({ email: normalized, lastSignInAt: new Date() })
-      .onConflictDoUpdate({
-        target: users.email,
-        set: { lastSignInAt: new Date() },
-      })
-      .returning(userColumns);
-    return user;
-  }
-
   private async signedIn(
     tx: Pick<Db, 'update'>,
     user: AppUser,
