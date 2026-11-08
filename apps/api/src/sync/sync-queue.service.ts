@@ -1,4 +1,9 @@
-import { Injectable, Logger, type OnApplicationBootstrap, type OnApplicationShutdown } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  type OnApplicationBootstrap,
+  type OnApplicationShutdown,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectDrizzle } from '@nestjs/drizzle';
 import { and, eq, inArray, ne } from 'drizzle-orm';
@@ -19,7 +24,9 @@ interface SyncJob {
 
 /** Background sync jobs, stored in the same Postgres. At most one queued + one running job per account. */
 @Injectable()
-export class SyncQueueService implements OnApplicationBootstrap, OnApplicationShutdown {
+export class SyncQueueService
+  implements OnApplicationBootstrap, OnApplicationShutdown
+{
   private readonly logger = new Logger(SyncQueueService.name);
   private readonly boss: PgBoss;
 
@@ -35,15 +42,29 @@ export class SyncQueueService implements OnApplicationBootstrap, OnApplicationSh
   async onApplicationBootstrap(): Promise<void> {
     await this.boss.start();
     // A full first sync of a long history can spend a while waiting out rate limits.
-    await this.boss.createQueue(QUEUE, { policy: 'stately', expireInSeconds: 4 * 60 * 60, retryLimit: 2 });
+    await this.boss.createQueue(QUEUE, {
+      policy: 'stately',
+      expireInSeconds: 4 * 60 * 60,
+      retryLimit: 2,
+    });
     await this.boss.work<SyncJob>(QUEUE, async ([job]) => {
       await this.sync.run(job.data.accountId, job.data.full, job.signal);
     });
     await this.recoverInterrupted();
+    this.started = true;
   }
 
   async onApplicationShutdown(): Promise<void> {
+    this.started = false;
     await this.boss.stop({ graceful: true });
+  }
+
+  private started = false;
+
+  /** For the health check: the worker is running and the queue answers. */
+  async healthy(): Promise<boolean> {
+    if (!this.started) return false;
+    return (await this.boss.getQueue(QUEUE)) !== null;
   }
 
   /**
@@ -59,25 +80,39 @@ export class SyncQueueService implements OnApplicationBootstrap, OnApplicationSh
     for (const { id } of stuck) {
       const jobs = await this.boss.findJobs<SyncJob>(QUEUE, { key: id });
       if (jobs.some((j) => LIVE_STATES.has(j.state))) continue;
-      this.logger.warn(`Account ${id}: sync was interrupted with no job left; resuming it`);
-      await this.db.update(brokerAccounts).set({ syncStatus: 'IDLE' }).where(eq(brokerAccounts.id, id));
+      this.logger.warn(
+        `Account ${id}: sync was interrupted with no job left; resuming it`,
+      );
+      await this.db
+        .update(brokerAccounts)
+        .set({ syncStatus: 'IDLE' })
+        .where(eq(brokerAccounts.id, id));
       await this.enqueue(id, false);
     }
   }
 
   /** Returns false when a sync for this account is already queued. */
   async enqueue(accountId: string, full: boolean): Promise<boolean> {
-    const jobId = await this.boss.send(QUEUE, { accountId, full } satisfies SyncJob, {
-      singletonKey: accountId,
-      // The worker reports in every 30 s; if the process dies, the job fails within a
-      // minute and is retried, and the retry resumes the sync where it stopped.
-      heartbeatSeconds: 60,
-    });
+    const jobId = await this.boss.send(
+      QUEUE,
+      { accountId, full } satisfies SyncJob,
+      {
+        singletonKey: accountId,
+        // The worker reports in every 30 s; if the process dies, the job fails within a
+        // minute and is retried, and the retry resumes the sync where it stopped.
+        heartbeatSeconds: 60,
+      },
+    );
     if (!jobId) return false;
     await this.db
       .update(brokerAccounts)
       .set({ syncStatus: 'QUEUED' })
-      .where(and(eq(brokerAccounts.id, accountId), ne(brokerAccounts.syncStatus, 'RUNNING')));
+      .where(
+        and(
+          eq(brokerAccounts.id, accountId),
+          ne(brokerAccounts.syncStatus, 'RUNNING'),
+        ),
+      );
     return true;
   }
 }

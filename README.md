@@ -46,6 +46,15 @@ npm run dev:web                    # http://localhost:4200, proxies /api to :300
   brought new records (or daily), the history is compared with Trading 212: shares per position and cash must match
   (`src/reconciliation`). The result shows in every account header; mismatches and unreadable records are listed on
   the overview.
+- `GET /api/health`: 200 when the database and the job queue answer, 503 (with which one failed) otherwise. No
+  sign-in, not rate limited, safe to poll.
+- Logs: one line per request (method, path, status, duration); never bodies (account creation carries API keys),
+  headers or query strings. `LOG_FORMAT=json` writes JSON lines.
+- Rate limits: 300 requests/min overall; account creation 5/min, sync 10/min, live portfolio 30/min, exports 20/min.
+- Security headers on every response (`app.useSecurityHeaders()`, Helmet 8 defaults).
+- Integration tests (`npm run test:e2e`): the real app against a real Postgres, in a database of their own
+  (`t212_ledger_test`, recreated each run), with a fake Trading 212. They cover first sync, nothing-new syncs,
+  appends, resuming an interrupted sync, rate limits, reconciliation, paging/filters, exports and access control.
 - CI (`.github/workflows/ci.yml`): typecheck, lint, tests, both builds, and `npm audit` failing on high/critical.
 
 ## API

@@ -16,6 +16,21 @@ jobs:
   check:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    services:
+      # For the integration tests; they create and drop their own database in it.
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: t212
+          POSTGRES_PASSWORD: t212
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U t212"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v4
 
@@ -38,6 +53,11 @@ jobs:
 
       - name: Unit tests (web)
         run: npm run test -w web -- --watch=false
+
+      - name: Integration tests (API + Postgres)
+        run: npm run test:e2e -w api
+        env:
+          TEST_DATABASE_ADMIN_URL: postgres://t212:t212@localhost:5432/postgres
 
       - name: Build API
         run: npm run build -w api

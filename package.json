@@ -16,6 +16,7 @@
     "lint": "npm run lint -w api",
     "typecheck": "npm run build:shared && npm run typecheck -w api && npm run typecheck -w web",
     "db:backup": "node scripts/db-backup.mjs",
-    "db:restore": "node scripts/db-restore.mjs"
+    "db:restore": "node scripts/db-restore.mjs",
+    "test:e2e": "npm run test:e2e -w api"
   }
 }

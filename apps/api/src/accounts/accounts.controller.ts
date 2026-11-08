@@ -1,10 +1,31 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, Post, Query, StreamableFile, UseGuards } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  Param,
+  Post,
+  Query,
+  StreamableFile,
+  UseGuards,
+} from '@nestjs/common';
 import { z } from 'zod';
 import { ExportService } from '../export/export.service.js';
 import { PortfolioService } from '../portfolio/portfolio.service.js';
-import { LEDGER_SORT_COLUMNS, LedgerService, SALE_SORTS, type LedgerSort } from '../ledger/ledger.service.js';
+import {
+  LEDGER_SORT_COLUMNS,
+  LedgerService,
+  SALE_SORTS,
+  type LedgerSort,
+} from '../ledger/ledger.service.js';
 import { SyncQueueService } from '../sync/sync-queue.service.js';
-import { CurrentUser, DevUserGuard, type CurrentUserData } from '../users/current-user.js';
+import {
+  CurrentUser,
+  DevUserGuard,
+  type CurrentUserData,
+} from '../users/current-user.js';
 import {
   accountIdSchema,
   createAccountSchema,
@@ -24,9 +45,22 @@ const pageSchema = {
 
 const ledgerQuerySchema = z.object({
   ...pageSchema,
-  sort: z.enum(Object.keys(LEDGER_SORT_COLUMNS) as [LedgerSort, ...LedgerSort[]]).default('date'),
+  sort: z
+    .enum(Object.keys(LEDGER_SORT_COLUMNS) as [LedgerSort, ...LedgerSort[]])
+    .default('date'),
   kind: z
-    .enum(['BUY', 'SELL', 'DEPOSIT', 'WITHDRAWAL', 'DIVIDEND', 'INTEREST', 'FEE', 'TRANSFER', 'CORPORATE_ACTION', 'OTHER'])
+    .enum([
+      'BUY',
+      'SELL',
+      'DEPOSIT',
+      'WITHDRAWAL',
+      'DIVIDEND',
+      'INTEREST',
+      'FEE',
+      'TRANSFER',
+      'CORPORATE_ACTION',
+      'OTHER',
+    ])
     .optional(),
 });
 
@@ -36,7 +70,9 @@ const salesQuerySchema = z.object({
   method: z.enum(['AVERAGE', 'FIFO']).default('AVERAGE'),
 });
 
-const reportQuerySchema = z.object({ method: z.enum(['AVERAGE', 'FIFO']).default('AVERAGE') });
+const reportQuerySchema = z.object({
+  method: z.enum(['AVERAGE', 'FIFO']).default('AVERAGE'),
+});
 
 const exportQuerySchema = reportQuerySchema.extend({
   format: z.enum(['xlsx', 'pdf']),
@@ -59,8 +95,13 @@ export class AccountsController {
     return this.accounts.list(user.id);
   }
 
+  // Each attempt validates the key against Trading 212.
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @Post()
-  async create(@CurrentUser() user: CurrentUserData, @Body({ schema: createAccountSchema }) dto: CreateAccountDto) {
+  async create(
+    @CurrentUser() user: CurrentUserData,
+    @Body({ schema: createAccountSchema }) dto: CreateAccountDto,
+  ) {
     const account = await this.accounts.create(user.id, dto);
     // The first sync walks the whole history anyway, and can resume if interrupted.
     const queued = await this.queue.enqueue(account.id, false);
@@ -68,16 +109,23 @@ export class AccountsController {
   }
 
   @Get(':id')
-  async get(@CurrentUser() user: CurrentUserData, @Param('id', { schema: accountIdSchema }) id: string) {
+  async get(
+    @CurrentUser() user: CurrentUserData,
+    @Param('id', { schema: accountIdSchema }) id: string,
+  ) {
     return toView(await this.accounts.get(user.id, id));
   }
 
   @Delete(':id')
   @HttpCode(204)
-  remove(@CurrentUser() user: CurrentUserData, @Param('id', { schema: accountIdSchema }) id: string) {
+  remove(
+    @CurrentUser() user: CurrentUserData,
+    @Param('id', { schema: accountIdSchema }) id: string,
+  ) {
     return this.accounts.remove(user.id, id);
   }
 
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @Post(':id/sync')
   @HttpCode(202)
   async sync(
@@ -94,7 +142,8 @@ export class AccountsController {
   async entries(
     @CurrentUser() user: CurrentUserData,
     @Param('id', { schema: accountIdSchema }) id: string,
-    @Query({ schema: ledgerQuerySchema }) query: z.infer<typeof ledgerQuerySchema>,
+    @Query({ schema: ledgerQuerySchema })
+    query: z.infer<typeof ledgerQuerySchema>,
   ) {
     await this.accounts.get(user.id, id);
     const { sort, dir, limit, offset, ...filter } = query;
@@ -105,16 +154,27 @@ export class AccountsController {
   async sales(
     @CurrentUser() user: CurrentUserData,
     @Param('id', { schema: accountIdSchema }) id: string,
-    @Query({ schema: salesQuerySchema }) query: z.infer<typeof salesQuerySchema>,
+    @Query({ schema: salesQuerySchema })
+    query: z.infer<typeof salesQuerySchema>,
   ) {
     await this.accounts.get(user.id, id);
     const { sort, dir, limit, offset, method, ...filter } = query;
-    return this.ledger.salesPage(id, method, filter, { sort, dir, limit, offset });
+    return this.ledger.salesPage(id, method, filter, {
+      sort,
+      dir,
+      limit,
+      offset,
+    });
   }
 
   /** Live value, total result and its breakdown, open positions. */
+  // Live data from Trading 212 (cached briefly); the page refreshes it once a minute.
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
   @Get(':id/portfolio')
-  async portfolio(@CurrentUser() user: CurrentUserData, @Param('id', { schema: accountIdSchema }) id: string) {
+  async portfolio(
+    @CurrentUser() user: CurrentUserData,
+    @Param('id', { schema: accountIdSchema }) id: string,
+  ) {
     const account = await this.accounts.get(user.id, id);
     return this.portfolios.view(account);
   }
@@ -123,20 +183,29 @@ export class AccountsController {
   async timeline(
     @CurrentUser() user: CurrentUserData,
     @Param('id', { schema: accountIdSchema }) id: string,
-    @Query({ schema: reportQuerySchema }) query: z.infer<typeof reportQuerySchema>,
+    @Query({ schema: reportQuerySchema })
+    query: z.infer<typeof reportQuerySchema>,
   ) {
     await this.accounts.get(user.id, id);
     return this.ledger.timeline(id, query.method);
   }
 
+  // PDF and Excel generation is the heaviest work the API does.
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
   @Get(':id/export')
   async export(
     @CurrentUser() user: CurrentUserData,
     @Param('id', { schema: accountIdSchema }) id: string,
-    @Query({ schema: exportQuerySchema }) query: z.infer<typeof exportQuerySchema>,
+    @Query({ schema: exportQuerySchema })
+    query: z.infer<typeof exportQuerySchema>,
   ): Promise<StreamableFile> {
     const account = await this.accounts.get(user.id, id);
-    const file = await this.exports.export(account, query.format, query.method, query.year ?? null);
+    const file = await this.exports.export(
+      account,
+      query.format,
+      query.method,
+      query.year ?? null,
+    );
     return new StreamableFile(file.buffer, {
       type: file.contentType,
       disposition: `attachment; filename="${file.filename}"`,
@@ -148,7 +217,8 @@ export class AccountsController {
   async report(
     @CurrentUser() user: CurrentUserData,
     @Param('id', { schema: accountIdSchema }) id: string,
-    @Query({ schema: reportQuerySchema }) query: z.infer<typeof reportQuerySchema>,
+    @Query({ schema: reportQuerySchema })
+    query: z.infer<typeof reportQuerySchema>,
   ) {
     const account = await this.accounts.get(user.id, id);
     return this.ledger.report(id, query.method, account.accountCurrency);

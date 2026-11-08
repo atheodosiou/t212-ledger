@@ -22,8 +22,6 @@ export interface CurrentUserData {
  */
 @Injectable()
 export class DevUserGuard implements CanActivate {
-  private cached: CurrentUserData | null = null;
-
   constructor(
     @InjectDrizzle() private readonly db: Db,
     private readonly config: ConfigService<Env, true>,
@@ -31,23 +29,29 @@ export class DevUserGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const email = this.config.get('DEV_USER_EMAIL', { infer: true });
-    if (!email) throw new UnauthorizedException('Sign-in is not implemented yet; set DEV_USER_EMAIL');
+    if (!email)
+      throw new UnauthorizedException(
+        'Sign-in is not implemented yet; set DEV_USER_EMAIL',
+      );
 
-    if (!this.cached) {
-      const [row] = await this.db
-        .insert(users)
-        .values({ email })
-        .onConflictDoUpdate({ target: users.email, set: { email } })
-        .returning({ id: users.id, email: users.email });
-      this.cached = row;
-    }
-    context.switchToHttp().getRequest<{ user?: CurrentUserData }>().user = this.cached;
+    // Looked up on every request (one indexed row) rather than cached: a cached id
+    // goes stale if the user row is ever recreated, and every account then 404s.
+    const [row] = await this.db
+      .insert(users)
+      .values({ email })
+      .onConflictDoUpdate({ target: users.email, set: { email } })
+      .returning({ id: users.id, email: users.email });
+    context.switchToHttp().getRequest<{ user?: CurrentUserData }>().user = row;
     return true;
   }
 }
 
-export const CurrentUser = createParamDecorator((_: unknown, ctx: ExecutionContext): CurrentUserData => {
-  const user = ctx.switchToHttp().getRequest<{ user?: CurrentUserData }>().user;
-  if (!user) throw new UnauthorizedException();
-  return user;
-});
+export const CurrentUser = createParamDecorator(
+  (_: unknown, ctx: ExecutionContext): CurrentUserData => {
+    const user = ctx
+      .switchToHttp()
+      .getRequest<{ user?: CurrentUserData }>().user;
+    if (!user) throw new UnauthorizedException();
+    return user;
+  },
+);
