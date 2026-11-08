@@ -1,5 +1,7 @@
 import request from 'supertest';
+import { AccountsService } from '../src/accounts/accounts.service.js';
 import { HistorySyncService } from '../src/sync/history-sync.service.js';
+import { T212RateLimitError } from '../src/trading212/t212.types.js';
 import { buyOrSell, cash, FakeT212, newestFirst } from './fake-t212.js';
 import {
   as,
@@ -173,5 +175,37 @@ describe('HTTP API', () => {
     expect(res.body).toMatchObject({ stale: false });
     expect(fake.requests.filter((r) => r === '/positions')).toHaveLength(1);
     expect(fake.requests.filter((r) => r === '/summary')).toHaveLength(2);
+  });
+
+  it('retries when the rate limit says it has already reset', async () => {
+    // Seen on the real account: "rate limited until 22:02:10.000Z" answered at
+    // 22:02:10.4 (Trading 212 states whole seconds). The wait is then negative, and
+    // must mean "try again now", not "give up".
+    const fake = new FakeT212();
+    fake.rateLimitAt = 1;
+    fake.rateLimitResetMs = -500;
+    const account = await seedAccount(t, fake);
+
+    await http().get(`/api/accounts/${account.id}/portfolio`).expect(200);
+    expect(fake.requests.filter((r) => r === '/summary')).toHaveLength(2);
+  });
+
+  it('keeps retrying while the limit lasts, within a few seconds', async () => {
+    // The first retry can come back limited too (the window ends later in that second).
+    const fake = new FakeT212();
+    const account = await seedAccount(t, fake);
+    const client = fake.client();
+    let summaries = 0;
+    const summary = client.accountSummary.bind(client);
+    // Limited twice in a row, each time saying it has already reset, then answers.
+    client.accountSummary = async () => {
+      if (++summaries <= 2)
+        throw new T212RateLimitError(new Date(Date.now() - 100));
+      return summary();
+    };
+    vi.spyOn(t.app.get(AccountsService), 'clientFor').mockReturnValue(client);
+
+    await http().get(`/api/accounts/${account.id}/portfolio`).expect(200);
+    expect(summaries).toBe(3);
   });
 });

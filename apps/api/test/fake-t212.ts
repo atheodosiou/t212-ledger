@@ -23,6 +23,8 @@ export class FakeT212 {
   failAt: number | null = null;
   /** Answers this request number with a rate limit, once. */
   rateLimitAt: number | null = null;
+  /** When that rate limit says it resets, from now. Trading 212 states whole seconds, so it can already be past. */
+  rateLimitResetMs = 50;
   /** Like Trading 212's per-endpoint limits: summary and positions each answer once per this window. */
   liveWindowMs: number | null = null;
   private readonly lastLive = new Map<string, number>();
@@ -237,7 +239,9 @@ export class FakeT212 {
     }
     if (this.rateLimitAt === n) {
       this.rateLimitAt = null;
-      throw new T212RateLimitError(new Date(Date.now() + 50));
+      throw new T212RateLimitError(
+        new Date(Date.now() + this.rateLimitResetMs),
+      );
     }
   }
 

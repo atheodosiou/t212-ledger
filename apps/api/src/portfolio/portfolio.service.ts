@@ -15,7 +15,10 @@ import { buildPortfolioView, type PortfolioView } from './portfolio-view.js';
 
 /** Live data is cached briefly: Trading 212 allows about one summary call every 5 seconds. */
 const LIVE_TTL_MS = 20_000;
+/** How long a page view may wait out Trading 212 rate limits in total. */
 const MAX_RATE_LIMIT_WAIT_MS = 8_000;
+const MIN_RATE_LIMIT_WAIT_MS = 500;
+const MAX_RATE_LIMIT_ATTEMPTS = 4;
 
 export interface LiveSnapshot {
   at: Date;
@@ -71,18 +74,30 @@ export class PortfolioService {
     // Each call is retried on its own: the two endpoints have separate rate limits, so
     // repeating both after one was limited would spend the other's allowance and fail it.
     // Nothing cached to fall back on: wait out a short rate-limit window once.
+    //
+    // Trading 212 states the reset in whole seconds, so it can already be past when the
+    // answer arrives (and a retry can still be limited for the rest of that second):
+    // wait at least a short moment, and try a few times within the overall budget.
+    const started = Date.now();
     const call = async <T>(fn: () => Promise<T>): Promise<T> => {
-      try {
-        return await fn();
-      } catch (error) {
-        const waitMs =
-          error instanceof T212RateLimitError
-            ? error.resetAt.getTime() - Date.now() + 250
-            : -1;
-        if (cached || waitMs < 0 || waitMs > MAX_RATE_LIMIT_WAIT_MS)
-          throw error;
-        await sleep(waitMs);
-        return fn();
+      for (let attempt = 1; ; attempt++) {
+        try {
+          return await fn();
+        } catch (error) {
+          if (
+            !(error instanceof T212RateLimitError) ||
+            cached ||
+            attempt >= MAX_RATE_LIMIT_ATTEMPTS
+          )
+            throw error;
+          const waitMs = Math.max(
+            MIN_RATE_LIMIT_WAIT_MS,
+            error.resetAt.getTime() - Date.now() + 250,
+          );
+          if (Date.now() + waitMs - started > MAX_RATE_LIMIT_WAIT_MS)
+            throw error;
+          await sleep(waitMs);
+        }
       }
     };
 
