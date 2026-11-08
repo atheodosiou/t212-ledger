@@ -55,7 +55,10 @@ export type AccountSection = 'overview' | 'accountant' | 'timeline';
     @if (error()) {
       <p role="alert" class="mt-2 rounded-lg bg-loss/5 p-2 text-sm text-loss">{{ error() }}</p>
     }
-    <nav class="mt-2 flex gap-1 overflow-x-auto" aria-label="Ενότητες λογαριασμού">
+    <nav
+      class="mt-2 flex gap-1 overflow-x-auto overflow-y-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      aria-label="Ενότητες λογαριασμού"
+    >
       @for (s of sections; track s.id) {
         <a
           [routerLink]="s.path(accountId())"
