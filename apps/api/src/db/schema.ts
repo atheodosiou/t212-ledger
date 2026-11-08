@@ -5,6 +5,7 @@ import {
   numeric,
   pgEnum,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   uniqueIndex,
@@ -18,11 +19,86 @@ const money = (name: string) => numeric(name, { precision: 20, scale: 6 });
 
 export const users = pgTable('users', {
   id: uuid().primaryKey().defaultRandom(),
+  /** Lower-cased. Verified by the sign-in provider. */
   email: text().notNull().unique(),
+  name: text(),
   createdAt: timestamp('created_at', { withTimezone: true })
     .notNull()
     .defaultNow(),
+  lastSignInAt: timestamp('last_sign_in_at', { withTimezone: true }),
 });
+
+/** Sign-in identities, linked by (provider, subject): never by email alone. */
+export const userIdentities = pgTable(
+  'user_identities',
+  {
+    provider: text().notNull(),
+    subject: text().notNull(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.provider, t.subject] }),
+    index('user_identities_user_idx').on(t.userId),
+  ],
+);
+
+/** Closed beta: only these addresses can create an account. Managed with `npm run users`. */
+export const invites = pgTable('invites', {
+  /** Lower-cased. */
+  email: text().primaryKey(),
+  createdAt: timestamp('created_at', { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  acceptedAt: timestamp('accepted_at', { withTimezone: true }),
+});
+
+/**
+ * Signed-in browsers. The id is the SHA-256 of the cookie token, never the token.
+ * No foreign key on user_id: the session store must accept any user id (its contract
+ * tests use made-up ones); a session whose user is gone signs no one in, and
+ * deleting a user deletes their sessions explicitly.
+ */
+export const sessions = pgTable(
+  'sessions',
+  {
+    id: text().primaryKey(),
+    userId: text('user_id').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    lastActiveAt: timestamp('last_active_at', {
+      withTimezone: true,
+    }).notNull(),
+    mfa: text().$type<'pending' | 'verified'>(),
+    metadata: jsonb().$type<Record<string, unknown>>(),
+  },
+  (t) => [
+    index('sessions_user_idx').on(t.userId),
+    index('sessions_expires_idx').on(t.expiresAt),
+  ],
+);
+
+/** Sign-ins in progress, between the redirect to Google and the callback (PKCE verifier, nonce). */
+export const oidcLogins = pgTable(
+  'oidc_logins',
+  {
+    /** SHA-256 of the secret in the browser's transaction cookie. */
+    state: text().primaryKey(),
+    provider: text().notNull(),
+    codeVerifier: text('code_verifier').notNull(),
+    nonce: text(),
+    redirectTo: text('redirect_to'),
+    linkUserId: text('link_user_id'),
+    linkSessionId: text('link_session_id'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  },
+  (t) => [index('oidc_logins_expires_idx').on(t.expiresAt)],
+);
 
 export const brokerEnvironment = pgEnum('broker_environment', ['DEMO', 'LIVE']);
 export const syncStatus = pgEnum('sync_status', [
@@ -197,6 +273,7 @@ export const instruments = pgTable('instruments', {
     .defaultNow(),
 });
 
+export type User = typeof users.$inferSelect;
 export type BrokerAccount = typeof brokerAccounts.$inferSelect;
 export type RawEvent = typeof rawEvents.$inferSelect;
 export type LedgerEntry = typeof ledgerEntries.$inferSelect;

@@ -1,4 +1,5 @@
 import { Controller, Get, HttpCode, HttpStatus, Res } from '@nestjs/common';
+import { Public } from '@nestjs/authentication';
 import { InjectDrizzle } from '@nestjs/drizzle';
 import { SkipThrottle } from '@nestjs/throttler';
 import { sql } from 'drizzle-orm';
@@ -24,6 +25,7 @@ const TIMEOUT_MS = 3_000;
  * 503 otherwise. No account data, no sign-in, not rate limited, so a monitor can poll it.
  */
 @Controller('health')
+@Public()
 @SkipThrottle()
 export class HealthController {
   constructor(

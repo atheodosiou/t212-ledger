@@ -91,6 +91,23 @@ export class SyncQueueService
     }
   }
 
+  /**
+   * Cancels the account's queued and retrying syncs (an account being deleted). A sync
+   * already running stops on its own: its writes fail once the account is gone, and a
+   * retry finds no account.
+   */
+  async cancel(accountId: string): Promise<void> {
+    const jobs = await this.boss.findJobs<SyncJob>(QUEUE, { key: accountId });
+    const pending = jobs.filter(
+      (j) => j.state === 'created' || j.state === 'retry',
+    );
+    if (pending.length)
+      await this.boss.cancel(
+        QUEUE,
+        pending.map((j) => j.id),
+      );
+  }
+
   /** Returns false when a sync for this account is already queued. */
   async enqueue(accountId: string, full: boolean): Promise<boolean> {
     const jobId = await this.boss.send(

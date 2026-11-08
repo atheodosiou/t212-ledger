@@ -234,3 +234,17 @@ export interface PageDto<T> {
 export interface SalesPageDto extends PageDto<RealisedSaleDto> {
   totals: { proceeds: string; costBasis: string; realisedPnl: string; brokerRealisedPnl: string; fees: string };
 }
+
+/** The signed-in user. */
+export interface UserDto {
+  id: string;
+  email: string;
+  name: string | null;
+}
+
+/** Sign-in methods the server offers. */
+export interface AuthConfigDto {
+  google: boolean;
+  /** Development only: the address of the "Sign in as" button. */
+  devUser: string | null;
+}

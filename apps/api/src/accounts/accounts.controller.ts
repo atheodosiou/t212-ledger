@@ -9,8 +9,8 @@ import {
   Post,
   Query,
   StreamableFile,
-  UseGuards,
 } from '@nestjs/common';
+import { CurrentUser } from '@nestjs/authentication';
 import { z } from 'zod';
 import { ExportService } from '../export/export.service.js';
 import { PortfolioService } from '../portfolio/portfolio.service.js';
@@ -21,11 +21,7 @@ import {
   type LedgerSort,
 } from '../ledger/ledger.service.js';
 import { SyncQueueService } from '../sync/sync-queue.service.js';
-import {
-  CurrentUser,
-  DevUserGuard,
-  type CurrentUserData,
-} from '../users/current-user.js';
+import type { AppUser } from '../auth/auth.types.js';
 import {
   accountIdSchema,
   createAccountSchema,
@@ -80,7 +76,6 @@ const exportQuerySchema = reportQuerySchema.extend({
 });
 
 @Controller('accounts')
-@UseGuards(DevUserGuard)
 export class AccountsController {
   constructor(
     private readonly accounts: AccountsService,
@@ -91,7 +86,7 @@ export class AccountsController {
   ) {}
 
   @Get()
-  list(@CurrentUser() user: CurrentUserData) {
+  list(@CurrentUser() user: AppUser) {
     return this.accounts.list(user.id);
   }
 
@@ -99,7 +94,7 @@ export class AccountsController {
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @Post()
   async create(
-    @CurrentUser() user: CurrentUserData,
+    @CurrentUser() user: AppUser,
     @Body({ schema: createAccountSchema }) dto: CreateAccountDto,
   ) {
     const account = await this.accounts.create(user.id, dto);
@@ -110,7 +105,7 @@ export class AccountsController {
 
   @Get(':id')
   async get(
-    @CurrentUser() user: CurrentUserData,
+    @CurrentUser() user: AppUser,
     @Param('id', { schema: accountIdSchema }) id: string,
   ) {
     return toView(await this.accounts.get(user.id, id));
@@ -118,18 +113,20 @@ export class AccountsController {
 
   @Delete(':id')
   @HttpCode(204)
-  remove(
-    @CurrentUser() user: CurrentUserData,
+  async remove(
+    @CurrentUser() user: AppUser,
     @Param('id', { schema: accountIdSchema }) id: string,
   ) {
-    return this.accounts.remove(user.id, id);
+    await this.accounts.get(user.id, id);
+    await this.queue.cancel(id);
+    await this.accounts.remove(user.id, id);
   }
 
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @Post(':id/sync')
   @HttpCode(202)
   async sync(
-    @CurrentUser() user: CurrentUserData,
+    @CurrentUser() user: AppUser,
     @Param('id', { schema: accountIdSchema }) id: string,
     @Body({ schema: syncRequestSchema }) body: SyncRequestDto,
   ) {
@@ -140,7 +137,7 @@ export class AccountsController {
 
   @Get(':id/ledger')
   async entries(
-    @CurrentUser() user: CurrentUserData,
+    @CurrentUser() user: AppUser,
     @Param('id', { schema: accountIdSchema }) id: string,
     @Query({ schema: ledgerQuerySchema })
     query: z.infer<typeof ledgerQuerySchema>,
@@ -152,7 +149,7 @@ export class AccountsController {
 
   @Get(':id/sales')
   async sales(
-    @CurrentUser() user: CurrentUserData,
+    @CurrentUser() user: AppUser,
     @Param('id', { schema: accountIdSchema }) id: string,
     @Query({ schema: salesQuerySchema })
     query: z.infer<typeof salesQuerySchema>,
@@ -172,7 +169,7 @@ export class AccountsController {
   @Throttle({ default: { limit: 30, ttl: 60_000 } })
   @Get(':id/portfolio')
   async portfolio(
-    @CurrentUser() user: CurrentUserData,
+    @CurrentUser() user: AppUser,
     @Param('id', { schema: accountIdSchema }) id: string,
   ) {
     const account = await this.accounts.get(user.id, id);
@@ -181,7 +178,7 @@ export class AccountsController {
 
   @Get(':id/timeline')
   async timeline(
-    @CurrentUser() user: CurrentUserData,
+    @CurrentUser() user: AppUser,
     @Param('id', { schema: accountIdSchema }) id: string,
     @Query({ schema: reportQuerySchema })
     query: z.infer<typeof reportQuerySchema>,
@@ -194,7 +191,7 @@ export class AccountsController {
   @Throttle({ default: { limit: 20, ttl: 60_000 } })
   @Get(':id/export')
   async export(
-    @CurrentUser() user: CurrentUserData,
+    @CurrentUser() user: AppUser,
     @Param('id', { schema: accountIdSchema }) id: string,
     @Query({ schema: exportQuerySchema })
     query: z.infer<typeof exportQuerySchema>,
@@ -215,7 +212,7 @@ export class AccountsController {
 
   @Get(':id/report')
   async report(
-    @CurrentUser() user: CurrentUserData,
+    @CurrentUser() user: AppUser,
     @Param('id', { schema: accountIdSchema }) id: string,
     @Query({ schema: reportQuerySchema })
     query: z.infer<typeof reportQuerySchema>,

@@ -29,10 +29,109 @@ npm run build:shared
 npm run dev:web                    # http://localhost:4200, proxies /api to :3000
 ```
 
+Sign in at http://localhost:4200 with the `DEV_USER_EMAIL` button (development only), or with Google once
+`GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are set (redirect URI
+`http://localhost:4200/api/auth/oidc/google/callback`).
+
+## Sign-in and users
+
+- Google only (`@nestjs/authentication`: OpenID Connect with PKCE and a nonce). No passwords are stored.
+- Server-side sessions in Postgres (`sessions`): an opaque token in an `HttpOnly`, `Secure`, `SameSite=Lax`
+  `__Host-sid` cookie, of which only the SHA-256 is stored. 30 days at most, 7 days idle.
+- Every route needs a signed-in user unless marked `@Public()` (health, the sign-in routes). Writes from another
+  origin are refused (`app.enableCsrfProtection()`).
+- Closed beta: an address must be invited before its first sign-in. Identities are linked by Google's subject id; an
+  address Google has not verified is refused.
+
+  ```bash
+  npm run users -w api -- invite someone@example.com
+  npm run users -w api -- uninvite someone@example.com
+  npm run users -w api -- list
+  ```
+
+- Google Cloud Console → APIs & Services → Credentials → Create OAuth client ID, type *Web application*:
+  - Authorized redirect URIs: `https://ledger.theodosiou.me/api/auth/oidc/google/callback`, plus the localhost one
+    above for development.
+  - OAuth consent screen: scopes `openid`, `email`, `profile` only; privacy policy `https://ledger.theodosiou.me/privacy`.
+
+## Personal data (GDPR)
+
+- *Ο λογαριασμός μου* (`/settings`) lets a user:
+  - download everything we hold (`GET /api/me/export`): one JSON file with the user, sign-in identities, sessions,
+    accounts, the raw Trading 212 history and the ledger, never the API keys;
+  - sign out everywhere;
+  - delete the account (`DELETE /api/me`; the user types their address to confirm). This removes the user, accounts
+    and keys, history, ledger, identities and sessions at once, and cancels queued syncs. Backups keep a copy for up
+    to 14 days.
+- `/privacy` says what is kept and why. Set `OPERATOR.contactEmail` in
+  `apps/web/src/app/pages/privacy/privacy.page.ts` before a public launch.
+
+## Rotating the encryption key
+
+Stored values name the key that encrypted them (`v2.<key id>.…`), so a key can be replaced without downtime:
+
+1. Generate a new key with `openssl rand -base64 32`, and keep it outside the server (a password manager).
+2. Set `CREDENTIAL_ENCRYPTION_KEY` to the new key and `CREDENTIAL_ENCRYPTION_KEYS_OLD` to the previous one, then
+   restart the API. New values use the new key; old ones still decrypt.
+3. Run `npm run credentials:rotate -w api -- --dry-run`, then again without `--dry-run`. In production:
+   `docker compose -f compose.prod.yml --env-file .env.production --profile tools run --rm credentials-rotate`.
+   It must report `unreadable: 0`.
+4. Keep the old key while backups from before step 3 exist (14 days), then remove `CREDENTIAL_ENCRYPTION_KEYS_OLD`
+   and restart. If a key may have leaked, also ask users to revoke their Trading 212 keys.
+
+## Production
+
+```text
+Browser ── https://ledger.theodosiou.me ──▶ Nginx (Contabo VPS)
+                                            ├─ /      → static web app in /var/www/t212-ledger/current
+                                            └─ /api/  → 127.0.0.1:3300 → API container (path unchanged)
+                                                         └─ Postgres container (no published port), daily backups
+```
+
+- Files:
+  - `Dockerfile`, with targets `api` and `web`;
+  - `compose.prod.yml`, project `t212-ledger-prod`;
+  - `deploy/nginx.conf` and `deploy/env.production.example`.
+- The web app loads nothing from other sites (the fonts are self-hosted), so its CSP allows `'self'` only.
+- To deploy: Actions → *CI and deployment* → Run workflow → `main`. The checks run, then the VPS runs
+  `deploy/t212-deploy.sh` for that commit:
+  1. builds both images;
+  2. takes a `pg_dump`;
+  3. migrates;
+  4. switches the API container;
+  5. switches the web release (an atomic symlink);
+  6. checks both through Nginx.
+
+  Any failure puts the previous API image and web release back. Migrations must stay additive (new tables and
+  columns), so the previous API can run on a migrated database.
+- One-time setup on the VPS, as root:
+  1. A DNS `A` record for `ledger.theodosiou.me`.
+  2. `git clone git@github.com:atheodosiou/t212-ledger.git /root/projects/t212-ledger`, with a read-only deploy key.
+  3. `cp deploy/env.production.example .env.production`, fill it in, and `chmod 600` it.
+  4. Nginx:
+     - copy `deploy/nginx.conf` to `/etc/nginx/sites-available/ledger.theodosiou.me` and link it into `sites-enabled`;
+     - run `nginx -t && systemctl reload nginx`;
+     - run `certbot --nginx -d ledger.theodosiou.me`.
+  5. Run `ssh-keygen -t ed25519 -N '' -f t212-actions` anywhere, then
+     `sudo bash deploy/install.sh "$(cat t212-actions.pub)"`.
+  6. GitHub → Settings → Secrets, environment `production`:
+     - `VPS_HOST`;
+     - `VPS_DEPLOY_KEY`: the private key;
+     - `VPS_KNOWN_HOSTS`: what install.sh printed, prefixed with the host.
+  7. Run the workflow, then invite yourself:
+     `docker compose -f compose.prod.yml --env-file .env.production --profile tools run --rm users invite <email>`.
+- After changing anything in `deploy/`, run `deploy/install.sh` on the VPS again.
+- Rolling back by hand:
+  - API: set `IMAGE_TAG` in `.env.production` to a previous tag, then run `docker compose … up -d api`.
+  - Web: point `/var/www/t212-ledger/current` at a previous release.
+  - Database: the dumps taken before each deploy are in `backups/t212_ledger-predeploy-*`.
+
 ## Safety
 
-- The API listens on 127.0.0.1 only (`HOST`), and refuses to start on any other address while sign-in is the
-  development stub (`DEV_USER_EMAIL`). The database port is published on 127.0.0.1 only.
+- The API listens on 127.0.0.1 only (`HOST`).
+- The development sign-in (`DEV_USER_EMAIL`) is refused on any other address and in production.
+- Production also requires Google sign-in and an https `WEB_ORIGIN`.
+- The database port is published on 127.0.0.1 only in development, and not at all in production.
 - Syncs survive crashes: jobs send a heartbeat, so a sync whose process died is retried within about a minute and
   resumes where it stopped. On start-up the API also re-queues any account left marked as syncing with no job.
 - Backups: the `db-backup` service writes a `pg_dump` every 24 h into `./backups` and keeps the newest 14.
@@ -54,13 +153,26 @@ npm run dev:web                    # http://localhost:4200, proxies /api to :300
 - Security headers on every response (`app.useSecurityHeaders()`, Helmet 8 defaults).
 - Integration tests (`npm run test:e2e`): the real app against a real Postgres, in a database of their own
   (`t212_ledger_test`, recreated each run), with a fake Trading 212. They cover first sync, nothing-new syncs,
-  appends, resuming an interrupted sync, rate limits, reconciliation, paging/filters, exports and access control.
-- CI (`.github/workflows/ci.yml`): typecheck, lint, tests, both builds, and `npm audit` failing on high/critical.
+  appends, resuming an interrupted sync, rate limits, reconciliation, paging/filters, exports, access control,
+  sessions, CSRF, invites, data export and erasure. They also run the auth package's contract suite against the
+  session store.
+- CI (`.github/workflows/ci.yml`):
+  - typecheck, lint and tests;
+  - both builds;
+  - `npm audit`, failing on high or critical;
+  - shellcheck of `deploy/`;
+  - both Docker images.
 
 ## API
 
 | Method | Path | |
 |---|---|---|
+| GET | `/api/auth/config` | public: `{ google, devUser }` |
+| GET | `/api/auth/oidc/google/login` | public: `?redirectTo=/path`, redirects to Google |
+| GET | `/api/auth/me` | the signed-in user (401 otherwise) |
+| POST | `/api/auth/logout`, `/api/auth/logout-everywhere` | |
+| GET | `/api/me/export` | all of the user's data, as a JSON download |
+| DELETE | `/api/me` | `{ confirmEmail }`: deletes the user and everything they own |
 | GET | `/api/accounts` | connected accounts |
 | POST | `/api/accounts` | `{ label, environment: DEMO\|LIVE, apiKey, apiSecret }`, validates the key, starts a full sync |
 | POST | `/api/accounts/:id/sync` | `{ full?: boolean }` |
@@ -74,7 +186,7 @@ npm run dev:web                    # http://localhost:4200, proxies /api to :300
 
 ## Status
 
-- Sign-in is a temporary single-user stub (`DEV_USER_EMAIL`). Real sign-in is required before any public deployment.
+- Sign-in with Google, invite-only (closed beta). Not yet tried with a real Google client, and not yet deployed.
 - Web UI: accounts list + connect form; per account three pages with a sticky header: Overview (live value, total result and breakdown, positions; collapses to a bar on scroll), For the accountant (period figures, exports, lazy-loaded sortable sales/movements tables), Timeline. Skeletons everywhere while a sync runs.
 - Timeline page: monthly buys/sells chart (with table view) and a per-instrument chart of buys, sells and the average-cost step line (hand-written SVG, no chart library).
 - Verified on a practice account (2026-11-07): `walletImpact.netValue` includes FX fees (BUY: cost + fee, SELL: proceeds - fee). Our realised P&L includes fees; Trading 212's own `realisedProfitLoss` and position cost exclude them, so they differ by exactly the fees.

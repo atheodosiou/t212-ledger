@@ -1,9 +1,13 @@
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { RouterLink, RouterOutlet } from '@angular/router';
+import { Auth } from './core/auth';
+import { UserMenu } from './ui/user-menu';
 
 @Component({
   selector: 'app-root',
-  imports: [RouterOutlet, RouterLink],
+  imports: [RouterOutlet, RouterLink, UserMenu],
   templateUrl: './app.html',
 })
-export class App {}
+export class App {
+  protected readonly auth = inject(Auth);
+}

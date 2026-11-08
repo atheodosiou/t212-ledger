@@ -1,0 +1,125 @@
+# Production on the VPS (README, "Production"). Every setting comes from .env.production next to
+# this file (git-ignored, lives only on the server): the app's variables, plus IMAGE_TAG, HOST_PORT and
+# POSTGRES_PASSWORD for Compose itself.
+#
+#   docker compose -f compose.prod.yml --env-file .env.production up -d db db-backup api
+#   docker compose -f compose.prod.yml --env-file .env.production --profile tools run --rm migrate
+#   docker compose -f compose.prod.yml --env-file .env.production --profile tools run --rm users list
+# Not "t212-ledger": that is the local development project (docker-compose.yml) and its database.
+name: t212-ledger-prod
+
+services:
+  db:
+    image: postgres:18
+    environment:
+      POSTGRES_USER: t212
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env.production}
+      POSTGRES_DB: t212_ledger
+    # No published port: only the containers of this project reach the database.
+    volumes:
+      - pgdata:/var/lib/postgresql
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U t212 -d t212_ledger"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging: &logging
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  api:
+    build:
+      context: .
+      target: api
+    image: t212-api:${IMAGE_TAG:?set IMAGE_TAG in .env.production}
+    env_file: .env.production
+    depends_on:
+      db:
+        condition: service_healthy
+    # Only this host's loopback (Nginx) can reach it.
+    ports:
+      - "127.0.0.1:${HOST_PORT:-3300}:3000"
+    restart: unless-stopped
+    init: true
+    stop_grace_period: 30s
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    logging: *logging
+
+  # One-off jobs, never started by `up`: migrations, invites, key rotation.
+  migrate:
+    profiles: ["tools"]
+    image: t212-api:${IMAGE_TAG}
+    env_file: .env.production
+    depends_on:
+      db:
+        condition: service_healthy
+    command: ["node", "dist/db/migrate.js"]
+    restart: "no"
+    logging: *logging
+
+  users:
+    profiles: ["tools"]
+    image: t212-api:${IMAGE_TAG}
+    env_file: .env.production
+    depends_on:
+      db:
+        condition: service_healthy
+    entrypoint: ["node", "dist/cli/users.js"]
+    restart: "no"
+    logging: *logging
+
+  credentials-rotate:
+    profiles: ["tools"]
+    image: t212-api:${IMAGE_TAG}
+    env_file: .env.production
+    depends_on:
+      db:
+        condition: service_healthy
+    entrypoint: ["node", "dist/cli/rotate-credentials.js"]
+    restart: "no"
+    logging: *logging
+
+  # Daily logical backup, newest 14 kept, in ./backups on the host (README, "Backups").
+  db-backup:
+    image: postgres:18
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PGHOST: db
+      PGUSER: t212
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      PGDATABASE: t212_ledger
+      KEEP: 14
+      EVERY_SECONDS: 86400
+    volumes:
+      - ./backups:/backups
+    restart: unless-stopped
+    entrypoint:
+      - sh
+      - -c
+      - |
+        set -eu
+        umask 077
+        while true; do
+          file="/backups/t212_ledger-$$(date -u +%Y%m%dT%H%M%SZ).dump"
+          if pg_dump --format=custom --file="$$file.tmp" && mv "$$file.tmp" "$$file"; then
+            echo "backup written: $$file"
+          else
+            echo "backup FAILED" >&2
+            rm -f "$$file.tmp"
+          fi
+          ls -1t /backups/*.dump 2>/dev/null | tail -n +$$((KEEP + 1)) | xargs -r rm -f
+          sleep "$$EVERY_SECONDS"
+        done
+    logging: *logging
+
+volumes:
+  pgdata:

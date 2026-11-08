@@ -1,0 +1,11 @@
+**/node_modules
+**/dist
+**/.angular
+**/coverage
+**/.env
+**/.env.*
+**/*.tsbuildinfo
+backups
+.git
+.github
+deploy

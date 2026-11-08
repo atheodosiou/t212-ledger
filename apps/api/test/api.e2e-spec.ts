@@ -2,15 +2,19 @@ import request from 'supertest';
 import { HistorySyncService } from '../src/sync/history-sync.service.js';
 import { buyOrSell, cash, FakeT212, newestFirst } from './fake-t212.js';
 import {
+  as,
   createTestApp,
   resetDb,
   seedAccount,
+  signIn,
   type TestApp,
 } from './helpers.js';
 
 describe('HTTP API', () => {
   let t: TestApp;
-  const http = () => request(t.app.getHttpServer());
+  let cookie: string;
+  const anonymous = () => request(t.app.getHttpServer());
+  const http = () => as(t, cookie);
 
   beforeAll(async () => {
     t = await createTestApp();
@@ -19,10 +23,11 @@ describe('HTTP API', () => {
   beforeEach(async () => {
     vi.restoreAllMocks();
     await resetDb(t.db);
+    cookie = await signIn(t);
   });
 
   it('reports health without needing an account', async () => {
-    const res = await http().get('/api/health').expect(200);
+    const res = await anonymous().get('/api/health').expect(200);
     expect(res.body).toMatchObject({
       status: 'ok',
       checks: { database: { status: 'up' }, queue: { status: 'up' } },
@@ -30,7 +35,7 @@ describe('HTTP API', () => {
   });
 
   it('sends security headers', async () => {
-    const res = await http().get('/api/health');
+    const res = await anonymous().get('/api/health');
     expect(res.headers['x-content-type-options']).toBe('nosniff');
     expect(res.headers['content-security-policy']).toContain(
       "default-src 'self'",

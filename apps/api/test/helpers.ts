@@ -1,4 +1,6 @@
 import type { INestApplication } from '@nestjs/common';
+import { SessionService } from '@nestjs/authentication';
+import request from 'supertest';
 import { Test } from '@nestjs/testing';
 import { getDrizzleToken } from '@nestjs/drizzle';
 import { eq, sql } from 'drizzle-orm';
@@ -26,7 +28,7 @@ export async function createTestApp(): Promise<TestApp> {
   const enqueue = vi.fn(async () => true);
   const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
     .overrideProvider(SyncQueueService)
-    .useValue({ enqueue, healthy: async () => true })
+    .useValue({ enqueue, cancel: async () => {}, healthy: async () => true })
     .compile();
   const app = moduleRef.createNestApplication({ logger: false });
   configureApp(app);
@@ -37,8 +39,32 @@ export async function createTestApp(): Promise<TestApp> {
 /** Empties every table, so each test starts from nothing. */
 export async function resetDb(db: Db): Promise<void> {
   await db.execute(
-    sql`truncate users, instruments, app_state restart identity cascade`,
+    sql`truncate users, sessions, oidc_logins, invites, instruments, app_state restart identity cascade`,
   );
+}
+
+/** Creates (or finds) a user and signs them in; returns the Cookie header value. */
+export async function signIn(
+  t: TestApp,
+  email = process.env.DEV_USER_EMAIL!,
+): Promise<string> {
+  const [user] = await t.db
+    .insert(users)
+    .values({ email })
+    .onConflictDoUpdate({ target: users.email, set: { email } })
+    .returning();
+  const { cookie } = await t.app.get(SessionService).create(user.id);
+  return cookie.split(';')[0];
+}
+
+/** supertest with a session cookie on every request. */
+export function as(t: TestApp, cookie: string) {
+  const server = t.app.getHttpServer();
+  return {
+    get: (url: string) => request(server).get(url).set('Cookie', cookie),
+    post: (url: string) => request(server).post(url).set('Cookie', cookie),
+    delete: (url: string) => request(server).delete(url).set('Cookie', cookie),
+  };
 }
 
 /** A connected account whose Trading 212 calls go to `fake`. */
