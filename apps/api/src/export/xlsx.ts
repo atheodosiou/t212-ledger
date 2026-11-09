@@ -11,6 +11,8 @@ import {
   type ReportData,
   WITHHOLDING_SOURCE_LABEL,
 } from './report-data.js';
+import type { TaxOverview } from '../tax/tax.service.js';
+import { TAX_CLASS_LABEL } from '../tax/tax.js';
 
 type ColumnType = 'text' | 'date' | 'money' | 'qty' | 'price';
 
@@ -34,7 +36,11 @@ const TOTAL_FILL: ExcelJS.Fill = {
   fgColor: { argb: 'FFF3F4F6' },
 };
 
-export async function buildXlsx(data: ReportData): Promise<Buffer> {
+/** `tax`: the Greek tax estimate of the year (all of the user's eligible accounts), when one year is exported. */
+export async function buildXlsx(
+  data: ReportData,
+  tax: TaxOverview | null = null,
+): Promise<Buffer> {
   const { meta } = data;
   const tz = meta.timeZone;
   const money =
@@ -638,6 +644,118 @@ export async function buildXlsx(data: ReportData): Promise<Buffer> {
     ],
     data.entries,
   );
+
+  // ── Φόροι ─────────────────────────────────────────────────────────────────
+  if (tax) {
+    const ws = addTable(
+      'Φόροι',
+      `Εκτίμηση ελληνικού φόρου · ${tax.year} · ${tax.accounts.map((a) => a.label).join(', ')}`,
+      [
+        { header: 'Κωδικός Ε1', width: 11, type: 'text', value: (l) => l.code },
+        { header: 'Περιγραφή', width: 60, type: 'text', value: (l) => l.label },
+        {
+          header: 'Ποσό',
+          width: 16,
+          type: 'money',
+          value: (l) => num(l.amount),
+        },
+      ],
+      tax.e1,
+    );
+    let r = 5 + tax.e1.length;
+    const line = (label: string, value: string | null, bold = false) => {
+      ws.getCell(r, 2).value = label;
+      if (value !== null) ws.getCell(r, 3).value = num(value);
+      if (bold) ws.getRow(r).font = { bold: true };
+      r++;
+    };
+    line('Φόρος μερισμάτων (5%, μετά τον συμψηφισμό)', tax.dividends.due);
+    line(
+      tax.interest.treatment === 'INTEREST'
+        ? 'Φόρος τόκων μετρητών (15%)'
+        : 'Φόρος τόκων μετρητών (αφορολόγητοι κατά τη ρύθμιση)',
+      tax.interest.tax,
+    );
+    line(
+      'Φόρος υπεραξίας (15%, μετά τις ζημιές προηγούμενων ετών)',
+      tax.gains.tax,
+    );
+    line('Σύνολο', tax.totalDue, true);
+    r++;
+    for (const note of [
+      `Οι κωδικοί είναι του Ε1 για το ${tax.e1CodesYear}. Του συζύγου: ο επόμενος αριθμός.`,
+      'Κόστος κτήσης με μέση τιμή και τα έξοδα (άρθρο 42 παρ. 3–4 ΚΦΕ), σε ευρώ με την ισοτιμία του Trading 212.',
+      'Ο φόρος εξωτερικού συμψηφίζεται για κάθε μέρισμα έως τον ελληνικό φόρο του (άρθρο 9 παρ. 2 ΚΦΕ).',
+      'Μετοχές με συμμετοχή <0,5% και UCITS ΕΕ/ΕΟΧ: κέρδη αφορολόγητα (659), ζημιές δεν μεταφέρονται.',
+      ...(tax.unconfirmed
+        ? [
+            `${tax.unconfirmed} τίτλοι έχουν την κατηγορία που πρότεινε η εφαρμογή, χωρίς επιβεβαίωση.`,
+          ]
+        : []),
+      ...tax.warnings,
+      'Εκτίμηση, όχι φορολογική συμβουλή.',
+    ]) {
+      ws.getCell(r, 2).value = note;
+      ws.getCell(r, 2).font = { italic: true, color: { argb: 'FF6B7280' } };
+      r++;
+    }
+
+    addTable(
+      'Φόροι · πωλήσεις',
+      `Πωλήσεις ${tax.year} και φορολογική κατηγορία`,
+      [
+        { header: 'Ημερομηνία', width: 17, type: 'date', value: (s) => s.date },
+        { header: 'Ticker', width: 10, type: 'text', value: (s) => s.ticker },
+        { header: 'ISIN', width: 15, type: 'text', value: (s) => s.isin },
+        {
+          header: 'Τίτλος',
+          width: 28,
+          type: 'text',
+          value: (s) => s.instrumentName,
+        },
+        {
+          header: 'Κατηγορία',
+          width: 18,
+          type: 'text',
+          value: (s) => TAX_CLASS_LABEL[s.taxClass],
+        },
+        {
+          header: 'Φορολογητέα',
+          width: 11,
+          type: 'text',
+          value: (s) => (s.taxable ? 'Ναι' : 'Όχι'),
+        },
+        {
+          header: 'Μετοχές',
+          width: 13,
+          type: 'qty',
+          value: (s) => num(s.quantity),
+        },
+        {
+          header: 'Έσοδο πώλησης',
+          width: 15,
+          type: 'money',
+          value: (s) => num(s.proceeds),
+          total: true,
+        },
+        {
+          header: 'Κόστος κτήσης',
+          width: 15,
+          type: 'money',
+          value: (s) => num(s.costBasis),
+          total: true,
+        },
+        {
+          header: 'Αποτέλεσμα',
+          width: 15,
+          type: 'money',
+          value: (s) => num(s.realisedPnl),
+          total: true,
+        },
+      ],
+      tax.gains.lines,
+    );
+  }
 
   // ── Έλεγχος ───────────────────────────────────────────────────────────────
   if (data.warnings.length || data.corporateActions.length) {

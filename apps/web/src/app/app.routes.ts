@@ -34,6 +34,17 @@ export const routes: Routes = [
         loadComponent: () => import('./pages/settings/settings.page').then((m) => m.SettingsPage),
       },
       {
+        path: 'taxes',
+        title: 'Φόροι · t212 ledger',
+        loadComponent: () => import('./pages/taxes/taxes.page').then((m) => m.TaxesPage),
+      },
+      {
+        path: 'taxes/instruments',
+        title: 'Κατηγορίες τίτλων · t212 ledger',
+        loadComponent: () =>
+          import('./pages/taxes/tax-instruments.page').then((m) => m.TaxInstrumentsPage),
+      },
+      {
         path: 'accounts/:id',
         title: 'Λογαριασμός · t212 ledger',
         loadComponent: () => import('./pages/account/account.page').then((m) => m.AccountPage),

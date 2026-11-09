@@ -10,6 +10,7 @@ import {
   ledgerEntries,
   rawEvents,
   sessions,
+  taxProfiles,
   userIdentities,
   users,
 } from '../db/schema.js';
@@ -74,10 +75,20 @@ export class UserDataService {
           .orderBy(asc(exportRows.occurredAt))
       : [];
 
+    const [tax] = await this.db
+      .select({
+        profile: taxProfiles.profile,
+        updatedAt: taxProfiles.updatedAt,
+      })
+      .from(taxProfiles)
+      .where(eq(taxProfiles.userId, userId));
+
     return {
       exportedAt: new Date().toISOString(),
       user,
       signIn: { identities },
+      /** Choices for the tax estimate: instrument classes, prior losses. */
+      taxSettings: tax ?? null,
       sessions: signedIn.map((s) => ({
         createdAt: s.createdAt,
         lastActiveAt: s.lastActiveAt,

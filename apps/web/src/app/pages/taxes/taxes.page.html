@@ -1,0 +1,600 @@
+<h1 class="text-2xl font-semibold tracking-tight">Φόροι</h1>
+<p class="mt-1 max-w-2xl text-sm text-muted">
+  Εκτίμηση του ελληνικού φόρου για τις επενδύσεις σου στο Trading 212, για φορολογικό κάτοικο
+  Ελλάδας. Δεν είναι φορολογική συμβουλή: έλεγξέ τη με τον λογιστή σου.
+</p>
+
+@if (tax.hasValue() && tax.value().years.length > 1) {
+  <div
+    role="group"
+    aria-label="Φορολογικό έτος"
+    class="-mx-4 mt-4 flex gap-2 overflow-x-auto px-4 [scrollbar-width:none]"
+  >
+    @for (y of tax.value().years; track y) {
+      <button
+        type="button"
+        (click)="year.set(y)"
+        [attr.aria-pressed]="tax.value().year === y"
+        class="min-h-10 shrink-0 rounded-full border px-4 text-sm font-medium transition"
+        [class]="
+          tax.value().year === y
+            ? 'border-brand bg-brand text-white'
+            : 'border-line bg-surface text-muted hover:text-ink'
+        "
+      >
+        {{ y }}
+      </button>
+    }
+  </div>
+}
+
+@if (tax.isLoading() && !tax.hasValue()) {
+  <div class="mt-6 space-y-4" aria-hidden="true">
+    <div class="h-36 animate-pulse rounded-xl bg-line/60"></div>
+    <div class="h-72 animate-pulse rounded-xl bg-line/60"></div>
+  </div>
+} @else if (tax.error() && !tax.hasValue()) {
+  <p class="mt-8 rounded-xl border border-loss/30 bg-loss/5 p-4 text-sm text-loss">
+    Ο υπολογισμός δεν φόρτωσε.
+  </p>
+} @else if (tax.hasValue()) {
+  @let t = tax.value();
+  @if (t.accounts.length === 0) {
+    <div
+      class="mt-8 rounded-xl border border-dashed border-line bg-surface p-8 text-center text-sm text-muted"
+    >
+      Ο υπολογισμός χρειάζεται έναν πραγματικό (Live) λογαριασμό σε ευρώ.
+      <a routerLink="/" class="font-medium text-brand hover:underline">Σύνδεσε έναν</a>.
+    </div>
+  } @else {
+    <div class="mt-4 space-y-3" [class.opacity-60]="tax.isLoading()" aria-live="polite">
+      @if (t.unconfirmed > 0) {
+        <a
+          routerLink="/taxes/instruments"
+          class="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 hover:bg-amber-100"
+        >
+          <span aria-hidden="true">⚠</span>
+          <span>
+            <strong>{{ t.unconfirmed }} τίτλοι</strong> έχουν κατηγορία που πρότεινε η εφαρμογή
+            χωρίς να την επιβεβαιώσεις. Από αυτήν εξαρτάται αν τα κέρδη φορολογούνται.
+            <span class="font-medium underline">Έλεγξέ τους ›</span>
+          </span>
+        </a>
+      }
+      @if (t.year === currentYear) {
+        <p class="rounded-xl border border-line bg-surface p-4 text-sm text-muted">
+          Το {{ t.year }} δεν έχει τελειώσει: τα ποσά είναι μέχρι σήμερα.
+        </p>
+      }
+      @for (w of t.warnings; track w) {
+        <p class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+          {{ w }}
+        </p>
+      }
+    </div>
+
+    <!-- Summary -->
+    <section
+      class="mt-4 rounded-xl border border-line bg-surface p-4 sm:p-5"
+      aria-labelledby="tax-due"
+      [class.opacity-60]="tax.isLoading()"
+    >
+      <h2 id="tax-due" class="text-sm text-muted">Φόρος που αναλογεί για το {{ t.year }}</h2>
+      <p class="mt-1 text-3xl font-semibold tracking-tight">{{ money(t.totalDue) }}</p>
+      <dl class="mt-4 grid gap-3 text-sm sm:grid-cols-3">
+        <div class="rounded-lg bg-canvas p-3">
+          <dt class="text-muted">Μερίσματα</dt>
+          <dd class="mt-0.5 font-semibold">{{ money(t.dividends.due) }}</dd>
+          <dd class="text-xs text-muted">
+            {{ percent(t.rates.dividend) }} του {{ money(t.dividends.gross) }}, μείον
+            {{ money(t.dividends.credit) }} φόρο εξωτερικού που συμψηφίζεται
+          </dd>
+        </div>
+        <div class="rounded-lg bg-canvas p-3">
+          <dt class="text-muted">Τόκοι μετρητών</dt>
+          <dd class="mt-0.5 font-semibold">{{ money(t.interest.tax) }}</dd>
+          <dd class="text-xs text-muted">
+            @if (t.interest.treatment === 'INTEREST') {
+              {{ percent(t.rates.interest) }} του {{ money(t.interest.gross) }}
+            } @else {
+              Αφορολόγητοι κατά τη ρύθμισή σου
+            }
+          </dd>
+        </div>
+        <div class="rounded-lg bg-canvas p-3">
+          <dt class="text-muted">Πωλήσεις</dt>
+          <dd class="mt-0.5 font-semibold">{{ money(t.gains.tax) }}</dd>
+          <dd class="text-xs text-muted">
+            @if (Number(t.gains.taxableAfterLosses) > 0) {
+              {{ percent(t.rates.gains) }} του {{ money(t.gains.taxableAfterLosses) }}
+            } @else if (Number(t.gains.taxableNet) < 0) {
+              Ζημιά {{ money(Number(t.gains.taxableNet) * -1) }}, μεταφέρεται
+            } @else {
+              Κανένα φορολογητέο κέρδος
+            }
+          </dd>
+        </div>
+      </dl>
+      @if (t.excluded.length) {
+        <p class="mt-3 text-xs text-muted">
+          Δεν περιλαμβάνονται:
+          @for (e of t.excluded; track e.id; let last = $last) {
+            {{ e.label }} ({{ e.reason }}){{ last ? '.' : ', ' }}
+          }
+        </p>
+      }
+    </section>
+
+    <!-- Ε1 -->
+    <section class="mt-6 rounded-xl border border-line bg-surface" aria-labelledby="e1-title">
+      <div class="p-4 pb-2 sm:p-5 sm:pb-2">
+        <h2 id="e1-title" class="font-semibold">Τι γράφεις στο Ε1</h2>
+        <p class="mt-1 text-xs text-muted">
+          Κωδικοί για τον υπόχρεο (του συζύγου: ο επόμενος αριθμός). Ποσά σε ευρώ.
+          @if (t.year !== t.e1CodesYear) {
+            <strong class="text-amber-800"
+              >Οι κωδικοί είναι του Ε1 για το {{ t.e1CodesYear }}· έλεγξέ τους για το
+              {{ t.year }}.</strong
+            >
+          }
+        </p>
+      </div>
+      <ul class="divide-y divide-line">
+        @for (l of incomeCodes(); track l.code) {
+          <li
+            class="flex items-center gap-3 px-4 py-2 sm:px-5"
+            [class.text-muted]="Number(l.amount) === 0"
+          >
+            <span
+              class="w-12 shrink-0 rounded-md bg-canvas py-1 text-center text-sm font-semibold tabular-nums text-ink"
+              >{{ l.code }}</span
+            >
+            <span class="min-w-0 flex-1 text-sm">{{ l.label }}</span>
+            <span class="shrink-0 text-sm font-medium tabular-nums">{{ money(l.amount) }}</span>
+            <button
+              type="button"
+              (click)="copy(l.code, l.amount)"
+              class="grid size-10 shrink-0 place-items-center rounded-lg text-muted transition hover:bg-canvas hover:text-ink"
+              [attr.aria-label]="'Αντιγραφή ποσού κωδικού ' + l.code"
+            >
+              <svg viewBox="0 0 20 20" class="size-4" fill="none" aria-hidden="true">
+                <rect
+                  x="7"
+                  y="7"
+                  width="10"
+                  height="10"
+                  rx="2"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                />
+                <path
+                  d="M13 4.5V4a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h.5"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                />
+              </svg>
+            </button>
+          </li>
+        }
+      </ul>
+      <div class="border-t border-line p-4 sm:p-5">
+        <h3 class="text-sm font-medium">Πίνακες 5–6: αιτιολόγηση δαπανών</h3>
+        <ul class="mt-1">
+          @for (l of justificationCodes(); track l.code) {
+            <li class="flex items-center gap-3 py-1">
+              <span
+                class="w-12 shrink-0 rounded-md bg-canvas py-1 text-center text-sm font-semibold tabular-nums"
+                >{{ l.code }}</span
+              >
+              <span class="min-w-0 flex-1 text-sm">{{ l.label }}</span>
+              <span class="shrink-0 text-sm font-medium tabular-nums">{{ money(l.amount) }}</span>
+              <button
+                type="button"
+                (click)="copy(l.code, l.amount)"
+                class="grid size-10 shrink-0 place-items-center rounded-lg text-muted transition hover:bg-canvas hover:text-ink"
+                [attr.aria-label]="'Αντιγραφή ποσού κωδικού ' + l.code"
+              >
+                <svg viewBox="0 0 20 20" class="size-4" fill="none" aria-hidden="true">
+                  <rect
+                    x="7"
+                    y="7"
+                    width="10"
+                    height="10"
+                    rx="2"
+                    stroke="currentColor"
+                    stroke-width="1.5"
+                  />
+                  <path
+                    d="M13 4.5V4a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h.5"
+                    stroke="currentColor"
+                    stroke-width="1.5"
+                  />
+                </svg>
+              </button>
+            </li>
+          }
+        </ul>
+        <p class="mt-1 text-xs text-muted">
+          Οι αγορές μετοχών είναι δαπάνη που πρέπει να καλύπτεται από εισόδημα (743). Το κόστος όσων
+          πούλησες επιστρέφει ως κεφάλαιο (781). Πώς ακριβώς συμπληρώνονται για συχνές συναλλαγές
+          δεν είναι ξεκάθαρο: ρώτα τον λογιστή.
+        </p>
+      </div>
+    </section>
+
+    <!-- Losses -->
+    <section
+      class="mt-6 rounded-xl border border-line bg-surface p-4 sm:p-5"
+      aria-labelledby="losses-title"
+    >
+      <h2 id="losses-title" class="font-semibold">Ζημιές που μεταφέρονται</h2>
+      <p class="mt-1 text-xs text-muted">
+        Μόνο ζημιές από φορολογητέους τίτλους (ETC, ταμεία εκτός ΕΕ, συμμετοχές ≥0,5%), για 5
+        χρόνια, οι παλαιότερες πρώτες (άρθρο 42 παρ. 5 ΚΦΕ). Ζημιές σε μετοχές και UCITS δεν
+        μετράνε, όπως και τα κέρδη τους δεν φορολογούνται.
+      </p>
+      @if (t.losses.pool.length === 0) {
+        <p class="mt-3 text-sm text-muted">Δεν υπάρχουν ζημιές για μεταφορά.</p>
+      } @else {
+        <ul class="mt-3 space-y-2">
+          @for (p of t.losses.pool; track p.originYear + (p.prior ? 'p' : '')) {
+            <li class="rounded-lg bg-canvas p-3 text-sm">
+              <div class="flex flex-wrap items-baseline justify-between gap-x-3">
+                <span class="font-medium">
+                  Ζημιά {{ p.originYear }}{{ p.prior ? ' (άλλος broker)' : '' }}
+                </span>
+                <span class="font-semibold tabular-nums">{{ money(p.remaining) }} απομένουν</span>
+              </div>
+              <p class="mt-0.5 text-xs text-muted">
+                Αρχικά {{ money(p.amount) }} · χρησιμοποιήθηκαν {{ money(p.used) }} · ισχύει έως και
+                το {{ p.usableUntil }}
+              </p>
+            </li>
+          }
+        </ul>
+        @if (Number(t.losses.expiring) > 0) {
+          <p class="mt-2 text-xs font-medium text-amber-800">
+            {{ money(t.losses.expiring) }} λήγουν στο τέλος του {{ t.year }}.
+          </p>
+        }
+      }
+    </section>
+
+    <!-- Breakdown -->
+    <h2 class="mt-8 font-semibold">Πώς βγαίνουν τα ποσά</h2>
+
+    <details class="group mt-3 rounded-xl border border-line bg-surface">
+      <summary class="flex min-h-12 cursor-pointer items-center justify-between gap-3 px-4 sm:px-5">
+        <span class="font-medium">Μερίσματα</span>
+        <span class="text-sm text-muted"
+          >{{ t.dividends.lines.length }} · {{ money(t.dividends.due) }}</span
+        >
+      </summary>
+      <div class="border-t border-line p-4 text-sm sm:p-5">
+        <p class="text-muted">
+          Φόρος {{ percent(t.rates.dividend) }} στο μικτό μέρισμα (άρθρο 40 παρ. 1 ΚΦΕ). Ο φόρος που
+          κρατήθηκε στο εξωτερικό αφαιρείται, αλλά για κάθε μέρισμα μόνο μέχρι τον ελληνικό φόρο
+          του· ό,τι περισσεύει χάνεται (άρθρο 9 παρ. 2). Οι ΗΠΑ κρατούν 30%, οπότε από τα
+          αμερικανικά μερίσματα δεν οφείλεται τίποτα. Διανομές UCITS: αφορολόγητες, στον 659. Ποσά
+          και ισοτιμίες από το export του Trading 212.
+        </p>
+        @if (t.dividends.lines.length) {
+          <table class="stack-table stack-flush mt-3 w-full">
+            <thead class="text-left text-xs text-muted">
+              <tr>
+                <th class="py-2 pr-3 font-medium">Ημερομηνία</th>
+                <th class="py-2 pr-3 font-medium">Τίτλος</th>
+                <th class="py-2 pr-3 text-right font-medium">Μικτό</th>
+                <th class="py-2 pr-3 text-right font-medium">Κρατήθηκε</th>
+                <th class="py-2 pr-3 text-right font-medium">Ελληνικός φόρος</th>
+                <th class="py-2 text-right font-medium">Οφείλεται</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-line">
+              @for (d of t.dividends.lines; track d.entryId) {
+                <tr>
+                  <td data-label="Ημερομηνία" class="whitespace-nowrap py-2 pr-3 text-muted">
+                    {{ date(d.date) }}
+                  </td>
+                  <td class="stack-title py-2 pr-3 font-medium">
+                    {{ d.ticker }}
+                    @if (d.adjustment) {
+                      <span class="text-xs font-normal text-muted">διόρθωση παρακράτησης</span>
+                    } @else if (d.exempt) {
+                      <span class="text-xs font-normal text-muted">UCITS, αφορολόγητο</span>
+                    }
+                    @if (d.estimated) {
+                      <span class="text-xs font-normal text-amber-800">εκτίμηση</span>
+                    }
+                  </td>
+                  <td data-label="Μικτό" class="whitespace-nowrap py-2 pr-3 text-right">
+                    {{ d.adjustment ? '' : money(d.gross) }}
+                  </td>
+                  <td data-label="Κρατήθηκε" class="whitespace-nowrap py-2 pr-3 text-right">
+                    {{ money(d.withheld)
+                    }}{{ d.withholdingRate ? ' (' + d.withholdingRate + '%)' : '' }}
+                  </td>
+                  <td data-label="Ελληνικός φόρος" class="whitespace-nowrap py-2 pr-3 text-right">
+                    {{ d.adjustment || d.exempt ? '' : money(d.greekTax) }}
+                  </td>
+                  <td data-label="Οφείλεται" class="whitespace-nowrap py-2 text-right font-medium">
+                    {{ d.adjustment || d.exempt ? '' : money(d.due) }}
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+          @if (Number(t.dividends.adjustments) !== 0) {
+            <p class="mt-2 text-xs text-muted">
+              Οι διορθώσεις παρακράτησης ({{ money(t.dividends.adjustments) }}) μειώνουν τον φόρο
+              εξωτερικού που συμψηφίζεται.
+            </p>
+          }
+        }
+      </div>
+    </details>
+
+    <details class="mt-3 rounded-xl border border-line bg-surface">
+      <summary class="flex min-h-12 cursor-pointer items-center justify-between gap-3 px-4 sm:px-5">
+        <span class="font-medium">Τόκοι μετρητών</span>
+        <span class="text-sm text-muted">{{ t.interest.count }} · {{ money(t.interest.tax) }}</span>
+      </summary>
+      <div class="border-t border-line p-4 text-sm sm:p-5">
+        <p class="text-muted">
+          Το Trading 212 πληρώνει τόκο στα μετρητά που δεν έχεις επενδύσει, χωρίς παρακράτηση.
+          Φορολογείται με {{ percent(t.rates.interest) }} ως τόκος αλλοδαπής (άρθρο 40 παρ. 2 ΚΦΕ,
+          κωδικός 669). Το {{ t.year }}: {{ t.interest.count }} πιστώσεις, σύνολο
+          {{ money(t.interest.gross) }}.
+        </p>
+      </div>
+    </details>
+
+    <details class="mt-3 rounded-xl border border-line bg-surface">
+      <summary class="flex min-h-12 cursor-pointer items-center justify-between gap-3 px-4 sm:px-5">
+        <span class="font-medium">Πωλήσεις</span>
+        <span class="text-sm text-muted"
+          >{{ t.gains.lines.length }} · {{ money(t.gains.tax) }}</span
+        >
+      </summary>
+      <div class="border-t border-line p-4 text-sm sm:p-5">
+        <p class="text-muted">
+          Κέρδος = τιμή πώλησης μείον κόστος κτήσης με <strong>μέση τιμή</strong>, μαζί με τα έξοδα
+          και την προμήθεια συναλλάγματος (άρθρο 42 παρ. 3–4 ΚΦΕ), σε ευρώ όπως τα μετέτρεψε το
+          Trading 212.
+        </p>
+        <dl class="mt-3 grid gap-3 sm:grid-cols-2">
+          <div class="rounded-lg bg-canvas p-3">
+            <dt class="font-medium">Αφορολόγητα: μετοχές &lt;0,5%, UCITS</dt>
+            <dd class="mt-1 flex justify-between">
+              <span class="text-muted">Κέρδη (659)</span>{{ money(t.gains.exemptGains) }}
+            </dd>
+            <dd class="flex justify-between">
+              <span class="text-muted">Ζημιές (δεν μετράνε)</span>{{ money(t.gains.exemptLosses) }}
+            </dd>
+          </div>
+          <div class="rounded-lg bg-canvas p-3">
+            <dt class="font-medium">Φορολογητέα: ETC, ταμεία εκτός ΕΕ, ≥0,5%</dt>
+            <dd class="mt-1 flex justify-between">
+              <span class="text-muted">Κέρδη</span>{{ money(t.gains.taxableGains) }}
+            </dd>
+            <dd class="flex justify-between">
+              <span class="text-muted">Ζημιές</span
+              >{{ money(Number(t.gains.taxableLosses) ? -Number(t.gains.taxableLosses) : 0) }}
+            </dd>
+            <dd class="flex justify-between">
+              <span class="text-muted">Ζημιές προηγούμενων ετών</span
+              >{{ money(Number(t.gains.lossesUsed) ? -Number(t.gains.lossesUsed) : 0) }}
+            </dd>
+            <dd class="mt-1 flex justify-between border-t border-line pt-1 font-medium">
+              <span>Φόρος {{ percent(t.rates.gains) }}</span
+              >{{ money(t.gains.tax) }}
+            </dd>
+          </div>
+        </dl>
+
+        @if (taxableSales().length) {
+          <h3 class="mt-4 font-medium">Φορολογητέες πωλήσεις</h3>
+          <ng-container *ngTemplateOutlet="sales; context: { $implicit: taxableSales() }" />
+        }
+        @if (exemptSales().length) {
+          <details class="mt-4">
+            <summary class="cursor-pointer font-medium">
+              Αφορολόγητες πωλήσεις ({{ exemptSales().length }})
+            </summary>
+            <ng-container *ngTemplateOutlet="sales; context: { $implicit: exemptSales() }" />
+          </details>
+        }
+      </div>
+    </details>
+
+    <!-- Assumptions -->
+    <section
+      class="mt-8 rounded-xl border border-line bg-surface p-4 sm:p-5"
+      aria-labelledby="assumptions-title"
+    >
+      <h2 id="assumptions-title" class="font-semibold">Παραδοχές</h2>
+      <p class="mt-1 text-xs text-muted">
+        Όπου ο νόμος δεν είναι ξεκάθαρος, η εφαρμογή διαλέγει την πιο συνηθισμένη ερμηνεία. Αυτές
+        αλλάζεις εσύ:
+      </p>
+
+      <div class="mt-4">
+        <a
+          routerLink="/taxes/instruments"
+          class="flex min-h-12 items-center justify-between gap-3 rounded-lg bg-canvas px-3 text-sm hover:bg-line/50"
+        >
+          <span>
+            <span class="font-medium">Κατηγορία κάθε τίτλου</span>
+            <span class="block text-xs text-muted">
+              {{ t.unconfirmed ? t.unconfirmed + ' χωρίς επιβεβαίωση' : 'Όλες επιβεβαιωμένες' }}
+            </span>
+          </span>
+          <span aria-hidden="true">›</span>
+        </a>
+      </div>
+
+      <fieldset class="mt-4" [disabled]="saving() || !settings.hasValue()">
+        <legend class="text-sm font-medium">Τόκοι μετρητών</legend>
+        <p class="text-xs text-muted">
+          Ένα μέρος των μετρητών μπορεί να τοποθετείται σε αμοιβαία διαθεσίμων (UCITS). Αν ο
+          λογιστής σου το δεχτεί, οι τόκοι είναι αφορολόγητοι.
+        </p>
+        <div class="mt-2 grid gap-2 sm:grid-cols-2">
+          @for (
+            o of [
+              { v: 'INTEREST', l: 'Τόκοι, 15% (669)', h: 'Η συνήθης αντιμετώπιση' },
+              { v: 'EXEMPT', l: 'Αφορολόγητοι (659)', h: 'Ως διανομή αμοιβαίου UCITS' },
+            ];
+            track o.v
+          ) {
+            <label
+              class="flex min-h-12 cursor-pointer items-start gap-3 rounded-lg border p-3 text-sm has-checked:border-brand has-checked:bg-brand/5"
+              [class.border-line]="settings.value()?.interest !== o.v"
+            >
+              <input
+                type="radio"
+                name="interest"
+                class="mt-0.5 accent-brand"
+                [checked]="settings.value()?.interest === o.v"
+                (change)="setInterest($any(o.v))"
+              />
+              <span>
+                <span class="font-medium">{{ o.l }}</span>
+                <span class="block text-xs text-muted">{{ o.h }}</span>
+              </span>
+            </label>
+          }
+        </div>
+      </fieldset>
+
+      <fieldset class="mt-5" [disabled]="saving() || !settings.hasValue()">
+        <legend class="text-sm font-medium">Ζημιές από άλλους brokers</legend>
+        <p class="text-xs text-muted">
+          Ζημιές από φορολογητέους τίτλους που δήλωσες σε προηγούμενα χρόνια (κωδικός 871) και δεν
+          φαίνονται εδώ.
+        </p>
+        @for (d of lossDrafts(); track $index; let i = $index) {
+          <div class="mt-2 flex items-end gap-2">
+            <label class="text-xs text-muted">
+              Έτος
+              <select
+                (change)="editLoss(i, 'year', $any($event.target).value)"
+                class="mt-0.5 block rounded-lg border border-line bg-surface px-2 py-2 text-sm text-ink"
+              >
+                @for (y of lossYears; track y) {
+                  <option [value]="y" [selected]="String(y) === d.year">{{ y }}</option>
+                }
+              </select>
+            </label>
+            <label class="min-w-0 flex-1 text-xs text-muted">
+              Ποσό (€)
+              <input
+                inputmode="decimal"
+                [value]="d.amount"
+                (input)="editLoss(i, 'amount', $any($event.target).value)"
+                placeholder="π.χ. 250,00"
+                class="mt-0.5 block w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink"
+              />
+            </label>
+            <button
+              type="button"
+              (click)="removeLoss(i)"
+              class="grid size-10 shrink-0 place-items-center rounded-lg text-muted hover:bg-canvas hover:text-loss"
+              [attr.aria-label]="'Αφαίρεση ζημιάς ' + d.year"
+            >
+              ✕
+            </button>
+          </div>
+        }
+        <div class="mt-3 flex flex-wrap gap-2">
+          <button
+            type="button"
+            (click)="addLoss()"
+            class="min-h-10 rounded-lg border border-line px-3 text-sm font-medium hover:bg-canvas"
+          >
+            + Προσθήκη
+          </button>
+          <button
+            type="button"
+            (click)="saveLosses()"
+            class="min-h-10 rounded-lg bg-brand px-4 text-sm font-medium text-white hover:bg-brand-strong disabled:opacity-60"
+          >
+            Αποθήκευση
+          </button>
+        </div>
+      </fieldset>
+
+      <h3 class="mt-5 text-sm font-medium">Σταθερές επιλογές</h3>
+      <ul class="mt-1 list-disc space-y-1 pl-5 text-xs text-muted">
+        <li>
+          Κόστος κτήσης με μέση τιμή, όπως ορίζει ο νόμος (άρθρο 42 παρ. 4) και όπως το Trading 212.
+        </li>
+        <li>Ποσά σε ευρώ με την ισοτιμία που εφάρμοσε το Trading 212 σε κάθε κίνηση.</li>
+        <li>
+          Ο φόρος εξωτερικού συμψηφίζεται χωριστά για κάθε μέρισμα (η πιο συντηρητική ερμηνεία).
+        </li>
+        <li>Κάθε κίνηση ανήκει στο έτος της ημερομηνίας της, ώρα Ελλάδας.</li>
+      </ul>
+    </section>
+
+    <section
+      class="mt-6 rounded-xl border border-line bg-surface p-4 text-sm sm:p-5"
+      aria-labelledby="open-title"
+    >
+      <h2 id="open-title" class="font-semibold">Ανοιχτά ερωτήματα για τον λογιστή</h2>
+      <ul class="mt-2 list-disc space-y-1 pl-5 text-muted">
+        <li>
+          Αρκεί η κατάσταση του Trading 212 ως απόδειξη του φόρου που κρατήθηκε στο εξωτερικό;
+        </li>
+        <li>Οι τόκοι μετρητών είναι τόκος (15%) ή διανομή αμοιβαίου UCITS (αφορολόγητη);</li>
+        <li>Τι μπαίνει στους κωδικούς 743 και 781 με συχνές αγορές και πωλήσεις;</li>
+        <li>Η προμήθεια μετατροπής νομίσματος μετράει στο κόστος κτήσης;</li>
+      </ul>
+    </section>
+  }
+}
+
+<ng-template #sales let-lines>
+  <table class="stack-table stack-flush mt-2 w-full">
+    <thead class="text-left text-xs text-muted">
+      <tr>
+        <th class="py-2 pr-3 font-medium">Ημερομηνία</th>
+        <th class="py-2 pr-3 font-medium">Τίτλος</th>
+        <th class="py-2 pr-3 text-right font-medium">Μετοχές</th>
+        <th class="py-2 pr-3 text-right font-medium">Πώληση</th>
+        <th class="py-2 pr-3 text-right font-medium">Κόστος</th>
+        <th class="py-2 text-right font-medium">Αποτέλεσμα</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-line">
+      @for (s of lines; track s.entryId) {
+        <tr>
+          <td data-label="Ημερομηνία" class="whitespace-nowrap py-2 pr-3 text-muted">
+            {{ date(s.date) }}
+          </td>
+          <td class="stack-title py-2 pr-3 font-medium">
+            {{ s.ticker }}
+            <span class="text-xs font-normal text-muted">{{ classLabelOf(s.taxClass) }}</span>
+          </td>
+          <td data-label="Μετοχές" class="whitespace-nowrap py-2 pr-3 text-right">
+            {{ qty(s.quantity) }}
+          </td>
+          <td data-label="Πώληση" class="whitespace-nowrap py-2 pr-3 text-right">
+            {{ money(s.proceeds) }}
+          </td>
+          <td data-label="Κόστος" class="whitespace-nowrap py-2 pr-3 text-right">
+            {{ money(s.costBasis) }}
+          </td>
+          <td
+            data-label="Αποτέλεσμα"
+            class="whitespace-nowrap py-2 text-right font-medium"
+            [class.text-gain]="Number(s.realisedPnl) > 0"
+            [class.text-loss]="Number(s.realisedPnl) < 0"
+          >
+            {{ money(s.realisedPnl) }}
+          </td>
+        </tr>
+      }
+    </tbody>
+  </table>
+</ng-template>

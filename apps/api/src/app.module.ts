@@ -25,6 +25,8 @@ import { HistorySyncService } from './sync/history-sync.service.js';
 import { SyncQueueService } from './sync/sync-queue.service.js';
 import { InstrumentsService } from './trading212/instruments.service.js';
 import { MeController } from './users/me.controller.js';
+import { TaxController } from './tax/tax.controller.js';
+import { TaxService } from './tax/tax.service.js';
 import { UserDataService } from './users/user-data.service.js';
 import { UsersService } from './users/users.service.js';
 
@@ -88,6 +90,7 @@ import { UsersService } from './users/users.service.js';
     AuthController,
     HealthController,
     MeController,
+    TaxController,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },
@@ -107,6 +110,7 @@ import { UsersService } from './users/users.service.js';
     GoogleAccountResolver,
     UsersService,
     UserDataService,
+    TaxService,
   ],
 })
 export class AppModule {}

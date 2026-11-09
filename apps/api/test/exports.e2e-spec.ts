@@ -1,3 +1,4 @@
+import ExcelJS from 'exceljs';
 import { and, eq } from 'drizzle-orm';
 import { brokerAccounts, ledgerEntries, rawEvents } from '../src/db/schema.js';
 import { ExportsService } from '../src/exports/exports.service.js';
@@ -218,5 +219,105 @@ describe('Trading 212 export', () => {
     // Deposit, buy and dividend: the deposit fee is a column of the deposit row.
     expect(res.body.exportState.years['2025'].rows).toBe(3);
     expect(JSON.stringify(res.body)).not.toMatch(/apiKeyEnc|apiSecretEnc/);
+  });
+  it('estimates the Greek tax of the year from the export, by instrument class', async () => {
+    const { account } = await syncedLiveAccount();
+    await exports.run(account.id, undefined, now);
+    const user = as(t, await signIn(t));
+    const code = (
+      body: { e1: { code: string; amount: string }[] },
+      c: string,
+    ) => body.e1.find((l) => l.code === c)?.amount;
+
+    // 2025: a US dividend with 30% withheld abroad, so no Greek tax is due.
+    const y2025 = (await user.get('/api/tax?year=2025').expect(200)).body;
+    expect(y2025.accounts.map((a: { id: string }) => a.id)).toEqual([
+      account.id,
+    ]);
+    expect(y2025.dividends).toMatchObject({
+      gross: '2.61',
+      greekTax: '0.13',
+      credit: '0.13',
+      due: '0.00',
+    });
+    expect(code(y2025, '295')).toBe('2.61');
+    expect(code(y2025, '743')).toBe('455.50');
+
+    // 2026: the sale of a share is exempt (659); the refund of withheld tax is no income.
+    const y2026 = (await user.get('/api/tax?year=2026').expect(200)).body;
+    expect(y2026.years).toEqual([2026, 2025]);
+    const pnl = y2026.gains.lines[0].realisedPnl;
+    expect(code(y2026, '659')).toBe(pnl);
+    expect(y2026.gains.tax).toBe('0.00');
+    expect(y2026.dividends.adjustments).toBe('-0.08');
+    // The traded share and the dividend payer.
+    expect(y2026.unconfirmed).toBe(2);
+
+    // Called an ETC, the same sale is taxed at 15%.
+    const list = (
+      await user
+        .put('/api/tax/instruments')
+        .send({ classes: { US00217D1000: 'ETC' } })
+        .expect(200)
+    ).body;
+    expect(list).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          isin: 'US00217D1000',
+          taxClass: 'ETC',
+          confirmed: true,
+        }),
+      ]),
+    );
+    const taxed = (await user.get('/api/tax?year=2026').expect(200)).body;
+    expect(code(taxed, '865')).toBe(pnl);
+    expect(taxed.gains.tax).toBe(
+      (Math.round(Number(pnl) * 15) / 100).toFixed(2),
+    );
+    expect(taxed.unconfirmed).toBe(1);
+
+    await user
+      .put('/api/tax/settings')
+      .send({ priorLosses: [{ year: 2024, amount: 'not money' }] })
+      .expect(400);
+    await user
+      .put('/api/tax/settings')
+      .send({ priorLosses: [{ year: 2024, amount: '10000' }] })
+      .expect(200);
+    const offset = (await user.get('/api/tax?year=2026').expect(200)).body;
+    expect(offset.gains.tax).toBe('0.00');
+    expect(offset.losses.pool[0]).toMatchObject({
+      originYear: 2024,
+      prior: true,
+    });
+
+    // The accountant's Excel of the year carries the estimate.
+    const xlsx = await user
+      .get(`/api/accounts/${account.id}/export?format=xlsx&year=2026`)
+      .buffer(true)
+      .parse((res, cb) => {
+        const chunks: Buffer[] = [];
+        res.on('data', (c: Buffer) => chunks.push(c));
+        res.on('end', () => cb(null, Buffer.concat(chunks)));
+      })
+      .expect(200);
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(
+      xlsx.body as unknown as Parameters<typeof wb.xlsx.load>[0],
+    );
+    const sheet = wb.getWorksheet('Φόροι')!;
+    const rows = sheet
+      .getSheetValues()
+      .map((r) => (Array.isArray(r) ? r.slice(1, 4) : []));
+    expect(rows).toContainEqual(['865', expect.any(String), Number(pnl)]);
+    expect(wb.getWorksheet('Φόροι · πωλήσεις')).toBeDefined();
+
+    // Someone else sees none of it.
+    const other = as(t, await signIn(t, 'other@localhost.test'));
+    const theirs = (await other.get('/api/tax').expect(200)).body;
+    expect(theirs.accounts).toEqual([]);
+    expect((await other.get('/api/tax/instruments').expect(200)).body).toEqual(
+      [],
+    );
   });
 });

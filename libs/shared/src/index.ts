@@ -1,28 +1,33 @@
 // Types shared by the API and the web app. Dates travel as ISO strings and
 // money/quantities as decimal strings, exactly as the API serializes them.
 
-export type BrokerEnvironment = 'DEMO' | 'LIVE';
-export type CostMethod = 'AVERAGE' | 'FIFO';
-export type SyncStatus = 'IDLE' | 'QUEUED' | 'RUNNING' | 'FAILED';
-export type ExportFormat = 'xlsx' | 'pdf';
+export type BrokerEnvironment = "DEMO" | "LIVE";
+export type CostMethod = "AVERAGE" | "FIFO";
+export type SyncStatus = "IDLE" | "QUEUED" | "RUNNING" | "FAILED";
+export type ExportFormat = "xlsx" | "pdf";
 export type LedgerKind =
-  | 'BUY'
-  | 'SELL'
-  | 'DEPOSIT'
-  | 'WITHDRAWAL'
-  | 'DIVIDEND'
-  | 'INTEREST'
-  | 'FEE'
-  | 'TRANSFER'
-  | 'CORPORATE_ACTION'
-  | 'OTHER';
+  | "BUY"
+  | "SELL"
+  | "DEPOSIT"
+  | "WITHDRAWAL"
+  | "DIVIDEND"
+  | "INTEREST"
+  | "FEE"
+  | "TRANSFER"
+  | "CORPORATE_ACTION"
+  | "OTHER";
 
-export type SyncStage = 'ORDERS' | 'DIVIDENDS' | 'TRANSACTIONS' | 'INSTRUMENTS' | 'LEDGER' | 'CHECK';
+export type SyncStage =
+  "ORDERS" | "DIVIDENDS" | "TRANSACTIONS" | "INSTRUMENTS" | "LEDGER" | "CHECK";
 
 export interface ReconciliationDto {
   checkedAt: string;
   ok: boolean;
-  issues: { kind: 'position' | 'cash' | 'unreadable' | 'unmapped' | 'history'; severity: 'error' | 'warning'; message: string }[];
+  issues: {
+    kind: "position" | "cash" | "unreadable" | "unmapped" | "history";
+    severity: "error" | "warning";
+    message: string;
+  }[];
   compared: { positions: number; cashLedger: string; cashBroker: string };
   stale?: boolean;
 }
@@ -55,11 +60,15 @@ export interface AccountDto {
 export interface ExportStateDto {
   years: Record<string, { coveredTo: string; fetchedAt: string; rows: number }>;
   running?: { year: number; reportId: number | null; since: string } | null;
-  blocked?: { reason: 'demo' | 'permission' | 'error'; message: string; at: string } | null;
+  blocked?: {
+    reason: "demo" | "permission" | "error";
+    message: string;
+    at: string;
+  } | null;
 }
 
 export interface ExportDifferenceDto {
-  kind: 'missing-from-api' | 'missing-from-export' | 'mismatch';
+  kind: "missing-from-api" | "missing-from-export" | "mismatch";
   date: string;
   what: string;
   detail: string;
@@ -148,7 +157,7 @@ export interface YearSummaryDto {
 export interface PositionEventDto {
   entryId: string;
   date: string;
-  kind: 'BUY' | 'SELL' | 'CORPORATE_ACTION';
+  kind: "BUY" | "SELL" | "CORPORATE_ACTION";
   sourceType: string;
   ticker: string;
   isin: string | null;
@@ -208,7 +217,7 @@ export interface DividendDetailDto {
   withheldOriginal: string | null;
   withheldCurrency: string | null;
   withholdingRate: string | null;
-  source: 'export' | 'api' | 'estimate' | 'adjustment';
+  source: "export" | "api" | "estimate" | "adjustment";
   estimated: boolean;
   note: string | null;
 }
@@ -237,7 +246,8 @@ export interface LivePositionDto {
   fxImpact: string | null;
 }
 
-export type BreakdownKey = 'realised' | 'unrealised' | 'dividends' | 'interest' | 'fees' | 'other';
+export type BreakdownKey =
+  "realised" | "unrealised" | "dividends" | "interest" | "fees" | "other";
 
 export interface PortfolioDto {
   asOf: string;
@@ -256,9 +266,17 @@ export interface PortfolioDto {
   stale: boolean;
 }
 
-export type SortDir = 'asc' | 'desc';
-export type LedgerSort = 'date' | 'kind' | 'ticker' | 'quantity' | 'price' | 'fees' | 'cash';
-export type SaleSort = 'date' | 'ticker' | 'quantity' | 'proceeds' | 'costBasis' | 'realisedPnl' | 'brokerRealisedPnl';
+export type SortDir = "asc" | "desc";
+export type LedgerSort =
+  "date" | "kind" | "ticker" | "quantity" | "price" | "fees" | "cash";
+export type SaleSort =
+  | "date"
+  | "ticker"
+  | "quantity"
+  | "proceeds"
+  | "costBasis"
+  | "realisedPnl"
+  | "brokerRealisedPnl";
 
 export interface PageDto<T> {
   items: T[];
@@ -269,7 +287,13 @@ export interface PageDto<T> {
 }
 
 export interface SalesPageDto extends PageDto<RealisedSaleDto> {
-  totals: { proceeds: string; costBasis: string; realisedPnl: string; brokerRealisedPnl: string; fees: string };
+  totals: {
+    proceeds: string;
+    costBasis: string;
+    realisedPnl: string;
+    brokerRealisedPnl: string;
+    fees: string;
+  };
 }
 
 /** The signed-in user. */
@@ -282,4 +306,111 @@ export interface UserDto {
 /** Sign-in methods the server offers. */
 export interface AuthConfigDto {
   google: boolean;
+}
+
+/** Greek tax treatment of an instrument. */
+export type TaxClass =
+  "SHARE" | "SHARE_QUALIFYING" | "UCITS" | "FUND_NON_EU" | "ETC";
+export type InterestTreatment = "INTEREST" | "EXEMPT";
+
+export interface TaxInstrumentDto {
+  isin: string;
+  ticker: string;
+  name: string | null;
+  type: string | null;
+  suggested: TaxClass;
+  taxClass: TaxClass;
+  confirmed: boolean;
+}
+
+export interface TaxSettingsDto {
+  interest: InterestTreatment;
+  priorLosses: { year: number; amount: string }[];
+}
+
+export interface TaxSaleLineDto {
+  entryId: string;
+  date: string;
+  ticker: string;
+  isin: string | null;
+  instrumentName: string | null;
+  taxClass: TaxClass;
+  quantity: string;
+  proceeds: string;
+  costBasis: string;
+  realisedPnl: string;
+  taxable: boolean;
+}
+
+export interface TaxDividendLineDto {
+  entryId: string;
+  date: string;
+  ticker: string;
+  isin: string | null;
+  instrumentName: string | null;
+  taxClass: TaxClass;
+  gross: string | null;
+  withheld: string | null;
+  withholdingRate: string | null;
+  greekTax: string;
+  credit: string;
+  due: string;
+  exempt: boolean;
+  adjustment: boolean;
+  estimated: boolean;
+  note: string | null;
+}
+
+export interface LossPoolEntryDto {
+  originYear: number;
+  amount: string;
+  used: string;
+  remaining: string;
+  usableUntil: number;
+  prior: boolean;
+}
+
+export interface TaxOverviewDto {
+  year: number;
+  years: number[];
+  supported: boolean;
+  rates: { dividend: string; interest: string; gains: string };
+  accounts: { id: string; label: string }[];
+  excluded: { id: string; label: string; reason: string }[];
+  e1CodesYear: number;
+  unconfirmed: number;
+  warnings: string[];
+  dividends: {
+    lines: TaxDividendLineDto[];
+    gross: string;
+    withheld: string;
+    adjustments: string;
+    greekTax: string;
+    credit: string;
+    due: string;
+    exemptGross: string;
+    estimated: number;
+  };
+  interest: {
+    gross: string;
+    count: number;
+    treatment: InterestTreatment;
+    tax: string;
+  };
+  gains: {
+    lines: TaxSaleLineDto[];
+    exemptGains: string;
+    exemptLosses: string;
+    taxableGains: string;
+    taxableLosses: string;
+    taxableNet: string;
+    lossesUsed: string;
+    taxableAfterLosses: string;
+    tax: string;
+    unmatched: number;
+  };
+  losses: { pool: LossPoolEntryDto[]; available: string; expiring: string };
+  justification: { purchases: string; capitalReturned: string };
+  e1: { code: string; label: string; amount: string }[];
+  totalDue: string;
 }

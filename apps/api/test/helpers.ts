@@ -63,6 +63,7 @@ export function as(t: TestApp, cookie: string) {
   return {
     get: (url: string) => request(server).get(url).set('Cookie', cookie),
     post: (url: string) => request(server).post(url).set('Cookie', cookie),
+    put: (url: string) => request(server).put(url).set('Cookie', cookie),
     delete: (url: string) => request(server).delete(url).set('Cookie', cookie),
   };
 }

@@ -16,8 +16,27 @@
           aria-hidden="true"
           >₮</span
         >
-        t212 ledger
+        <span class="max-sm:sr-only">t212 ledger</span>
       </a>
+      @if (auth.user()) {
+        <nav aria-label="Κύριο μενού" class="ml-3 mr-auto flex items-center gap-1 text-sm">
+          <a
+            routerLink="/"
+            routerLinkActive="bg-canvas text-ink"
+            [routerLinkActiveOptions]="{ exact: true }"
+            ariaCurrentWhenActive="page"
+            class="flex min-h-10 items-center rounded-lg px-3 text-muted transition hover:text-ink"
+            >Λογαριασμοί</a
+          >
+          <a
+            routerLink="/taxes"
+            routerLinkActive="bg-canvas text-ink"
+            ariaCurrentWhenActive="page"
+            class="flex min-h-10 items-center rounded-lg px-3 text-muted transition hover:text-ink"
+            >Φόροι</a
+          >
+        </nav>
+      }
       <app-user-menu />
     </div>
   </header>

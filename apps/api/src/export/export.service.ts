@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { BrokerAccount } from '../db/schema.js';
 import type { CostMethod } from '../ledger/cost-basis.js';
 import { LedgerService } from '../ledger/ledger.service.js';
+import { TaxService } from '../tax/tax.service.js';
 import { buildPdf } from './pdf.js';
 import { buildReportData } from './report-data.js';
 import { buildXlsx } from './xlsx.js';
@@ -21,7 +22,10 @@ const CONTENT_TYPES: Record<ExportFormat, string> = {
 
 @Injectable()
 export class ExportService {
-  constructor(private readonly ledger: LedgerService) {}
+  constructor(
+    private readonly ledger: LedgerService,
+    private readonly tax: TaxService,
+  ) {}
 
   async export(
     account: BrokerAccount,
@@ -39,8 +43,16 @@ export class ExportService {
       generatedAt: new Date(),
       dividendExportRows: await this.ledger.dividendExportRows(account.id),
     });
+    // The tax estimate is per person, over every live account in EUR; only for one year.
+    const tax =
+      format === 'xlsx' &&
+      year !== null &&
+      account.environment === 'LIVE' &&
+      account.accountCurrency === 'EUR'
+        ? await this.tax.overview(account.userId, year)
+        : null;
     const buffer =
-      format === 'xlsx' ? await buildXlsx(data) : await buildPdf(data);
+      format === 'xlsx' ? await buildXlsx(data, tax) : await buildPdf(data);
     const slug =
       account.label
         .toLowerCase()

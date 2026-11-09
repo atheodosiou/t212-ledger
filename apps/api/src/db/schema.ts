@@ -318,6 +318,39 @@ export const instruments = pgTable('instruments', {
     .defaultNow(),
 });
 
+/** Greek tax treatment of an instrument (see docs/tax-design.md). */
+export type TaxClass =
+  /** Listed share, holding under 0.5%: gains exempt, dividends 5%. */
+  | 'SHARE'
+  /** Listed share, holding of 0.5% or more: gains 15%. */
+  | 'SHARE_QUALIFYING'
+  /** EU/EEA UCITS fund: gains and distributions exempt. */
+  | 'UCITS'
+  /** Fund outside the EU/EEA (e.g. a US ETF): gains 15%, distributions 5%. */
+  | 'FUND_NON_EU'
+  /** Exchange-traded commodity or note (e.g. physical gold): gains 15%. */
+  | 'ETC';
+
+export interface TaxProfile {
+  /** The user's choice per ISIN; instruments not here use the suggested class. */
+  classes: Record<string, TaxClass>;
+  /** How interest on cash is treated: as interest (15%) or as exempt fund income. */
+  interest: 'INTEREST' | 'EXEMPT';
+  /** Losses from before this app's history (other brokers), by the year they arose. */
+  priorLosses: { year: number; amount: string }[];
+}
+
+/** One row per user: their choices for the tax estimate. */
+export const taxProfiles = pgTable('tax_profiles', {
+  userId: uuid('user_id')
+    .primaryKey()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  profile: jsonb().$type<TaxProfile>().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
 export type User = typeof users.$inferSelect;
 export type BrokerAccount = typeof brokerAccounts.$inferSelect;
 export type RawEvent = typeof rawEvents.$inferSelect;
