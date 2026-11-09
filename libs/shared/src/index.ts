@@ -197,6 +197,42 @@ export interface TimelineDto {
   method: CostMethod;
   months: MonthBucketDto[];
   instruments: InstrumentTimelineDto[];
+  journey: JourneyDto;
+}
+
+export interface JourneySeriesDto {
+  key: string;
+  ticker: string;
+  instrumentName: string | null;
+}
+
+export interface JourneyMonthDto {
+  month: string;
+  /** Cost of the shares held at the end of the month. */
+  invested: string;
+  /** Per series; the last is everything else. */
+  values: string[];
+  positions: number;
+}
+
+export type MilestoneKind =
+  "FIRST_DEPOSIT" | "NEW_POSITION" | "CLOSED" | "FIRST_DIVIDEND" | "WITHDRAWAL";
+
+export interface MilestoneDto {
+  kind: MilestoneKind;
+  date: string;
+  ticker: string | null;
+  isin: string | null;
+  instrumentName: string | null;
+  amount: string | null;
+  realisedPnl: string | null;
+  again: boolean;
+}
+
+export interface JourneyDto {
+  series: JourneySeriesDto[];
+  months: JourneyMonthDto[];
+  milestones: MilestoneDto[];
 }
 
 export interface DividendDetailDto {

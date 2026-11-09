@@ -9,6 +9,8 @@ describe('chart utils', () => {
 
   it('picks round ticks that cover the data', () => {
     expect(niceTicks(0, 25461)).toEqual([0, 10000, 20000, 30000]);
+    // Just past a step: the scale still reaches the top value.
+    expect(niceTicks(0, 12369)).toEqual([0, 5000, 10000, 15000]);
     const ticks = niceTicks(230, 270);
     expect(ticks[0]).toBeLessThanOrEqual(230);
     expect(ticks[ticks.length - 1]).toBeGreaterThanOrEqual(270);

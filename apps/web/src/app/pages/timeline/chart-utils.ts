@@ -36,6 +36,8 @@ export function niceTicks(min: number, max: number, count = 4): number[] {
   const start = Math.floor(min / step) * step;
   const ticks: number[] = [];
   for (let v = start; v <= max + step * 0.5; v += step) ticks.push(Number(v.toFixed(10)));
+  // The last tick is the top of the scale: it must reach the largest value.
+  while (ticks[ticks.length - 1] < max) ticks.push(Number((ticks[ticks.length - 1] + step).toFixed(10)));
   return ticks;
 }
 

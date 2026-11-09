@@ -46,6 +46,28 @@
       Δεν υπάρχουν ακόμα κινήσεις.
     </div>
   } @else {
+    <!-- Journey -->
+    <section
+      class="mt-8 rounded-xl border border-line bg-surface p-4 sm:p-5"
+      aria-labelledby="journey-title"
+    >
+      @let j = data.journey;
+      @let now = j.months[j.months.length - 1];
+      <h2 id="journey-title" class="font-semibold">Το επενδυτικό σου ταξίδι</h2>
+      <p class="mt-1 text-sm text-muted">
+        Πόσα χρήματα είχες σε κάθε μετοχή στο τέλος κάθε μήνα (κόστος κτήσης, όχι τρέχουσα αξία).
+        Σήμερα: <strong class="text-ink">{{ money(now.invested, cur) }}</strong> σε
+        {{ now.positions }} {{ now.positions === 1 ? 'θέση' : 'θέσεις' }}.
+      </p>
+      <app-journey-chart class="mt-4" [journey]="j" [currency]="cur" />
+      <h3 class="mb-3 mt-6 text-sm font-medium text-muted">Σταθμοί</h3>
+      <app-journey-milestones
+        [milestones]="j.milestones"
+        [currency]="cur"
+        (pick)="pickInstrument($event)"
+      />
+    </section>
+
     <!-- Monthly -->
     <section class="mt-8 rounded-xl border border-line bg-surface p-5">
       <div class="mb-4 flex items-center justify-between gap-4">
@@ -109,7 +131,7 @@
     </section>
 
     <!-- Per instrument -->
-    <section class="mt-6 rounded-xl border border-line bg-surface p-5">
+    <section id="instrument" class="mt-6 scroll-mt-4 rounded-xl border border-line bg-surface p-5">
       <div class="flex flex-wrap items-end justify-between gap-4">
         <h2 class="font-semibold">Ανά μετοχή</h2>
         <label class="block w-full text-sm sm:w-auto">

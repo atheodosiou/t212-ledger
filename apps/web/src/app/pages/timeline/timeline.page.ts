@@ -17,6 +17,8 @@ import { InstrumentChart } from './instrument-chart';
 import { CostMethodPicker } from '../../ui/cost-method-picker';
 import { toastOnError } from '../../core/toasts';
 import { MonthlyChart } from './monthly-chart';
+import { JourneyChart } from './journey-chart';
+import { JourneyMilestones } from './journey-milestones';
 
 @Component({
   selector: 'app-timeline-page',
@@ -25,6 +27,8 @@ import { MonthlyChart } from './monthly-chart';
     StickyTop,
     SyncProgress,
     MonthlyChart,
+    JourneyChart,
+    JourneyMilestones,
     InstrumentChart,
     CostMethodPicker,
   ],
@@ -79,6 +83,13 @@ export class TimelinePage {
   });
 
   protected readonly showMonthTable = signal(false);
+
+  /** From a milestone: show that instrument's history below. */
+  protected pickInstrument(isin: string | null): void {
+    if (!isin || !this.instruments().some((i) => key(i) === isin)) return;
+    this.selectedKey.set(isin);
+    document.getElementById('instrument')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
 
   protected readonly key = key;
   protected readonly money = money;

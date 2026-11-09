@@ -38,7 +38,50 @@ export interface Timeline {
   method: CostMethod;
   months: MonthBucket[];
   instruments: InstrumentTimeline[];
+  journey: Journey;
 }
+
+/** One line of the stacked chart: an instrument, or everything else. */
+export interface JourneySeries {
+  key: string;
+  ticker: string;
+  instrumentName: string | null;
+}
+
+export interface JourneyMonth {
+  month: string;
+  /** Money in open positions at the end of the month (cost of the shares held). */
+  invested: string;
+  /** Per series, in the order of `series`; the last is everything else. */
+  values: string[];
+  positions: number;
+}
+
+export type MilestoneKind =
+  'FIRST_DEPOSIT' | 'NEW_POSITION' | 'CLOSED' | 'FIRST_DIVIDEND' | 'WITHDRAWAL';
+
+export interface Milestone {
+  kind: MilestoneKind;
+  date: Date;
+  ticker: string | null;
+  isin: string | null;
+  instrumentName: string | null;
+  /** Deposit or withdrawal amount; cost of the first buy of a position. */
+  amount: string | null;
+  /** Result of a position from opening to closing (closed positions). */
+  realisedPnl: string | null;
+  /** The position had been held before and closed. */
+  again: boolean;
+}
+
+export interface Journey {
+  series: JourneySeries[];
+  months: JourneyMonth[];
+  milestones: Milestone[];
+}
+
+/** Instruments drawn on their own; the rest are summed as one. */
+export const JOURNEY_SERIES = 7;
 
 type MoneyField =
   | 'deposits'
@@ -171,11 +214,170 @@ export function buildTimeline(
   return {
     method,
     months,
+    journey: buildJourney(
+      entries,
+      engine.positionEvents,
+      months.map((m) => m.month),
+      monthOf,
+    ),
     // Most traded first; ties alphabetically.
     instruments: [...byInstrument.values()].sort(
       (a, b) => b.trades - a.trades || a.ticker.localeCompare(b.ticker),
     ),
   };
+}
+
+/**
+ * The investment journey: how much money sat in each position at the end of every
+ * month (cost of the shares held, so it is exact and needs no market prices), and the
+ * moments worth marking: first deposit, every new position, every position closed.
+ */
+export function buildJourney(
+  entries: EngineEntry[],
+  events: PositionEvent[],
+  monthList: string[],
+  monthOf: (date: Date) => string,
+): Journey {
+  const keyOf = (e: { isin: string | null; ticker: string }) =>
+    e.isin ?? e.ticker;
+  const names = new Map<
+    string,
+    { ticker: string; instrumentName: string | null }
+  >();
+  const cost = new Map<string, Decimal>();
+  const peak = new Map<string, Decimal>();
+  const snapshots = new Map<string, Map<string, Decimal>>();
+  const milestones: Milestone[] = [];
+  const everHeld = new Set<string>();
+  const periodPnl = new Map<string, Decimal>();
+
+  const sorted = [...events].sort(
+    (a, b) => a.date.getTime() - b.date.getTime(),
+  );
+  let i = 0;
+  for (const month of monthList) {
+    for (; i < sorted.length && monthOf(sorted[i].date) <= month; i++) {
+      const e = sorted[i];
+      const key = keyOf(e);
+      names.set(key, { ticker: e.ticker, instrumentName: e.instrumentName });
+      const before = cost.get(key) ?? new Decimal(0);
+      const held = new Decimal(e.positionQuantity);
+      const now =
+        e.averageCost && held.gt(0)
+          ? held.times(e.averageCost)
+          : new Decimal(0);
+      cost.set(key, now);
+      if (now.gt(peak.get(key) ?? 0)) peak.set(key, now);
+
+      if (e.kind === 'BUY' && before.lte(0)) {
+        milestones.push({
+          kind: 'NEW_POSITION',
+          date: e.date,
+          ticker: e.ticker,
+          isin: e.isin,
+          instrumentName: e.instrumentName,
+          amount: now.toFixed(2),
+          realisedPnl: null,
+          again: everHeld.has(key),
+        });
+        everHeld.add(key);
+        periodPnl.set(key, new Decimal(0));
+      }
+      if (e.realisedPnl)
+        periodPnl.set(
+          key,
+          (periodPnl.get(key) ?? new Decimal(0)).plus(e.realisedPnl),
+        );
+      if (e.kind === 'SELL' && held.lte(0) && before.gt(0)) {
+        milestones.push({
+          kind: 'CLOSED',
+          date: e.date,
+          ticker: e.ticker,
+          isin: e.isin,
+          instrumentName: e.instrumentName,
+          amount: null,
+          realisedPnl: (periodPnl.get(key) ?? new Decimal(0)).toFixed(2),
+          again: false,
+        });
+      }
+    }
+    snapshots.set(month, new Map(cost));
+  }
+
+  const top = [...peak.entries()]
+    .sort(([, a], [, b]) => b.comparedTo(a))
+    .slice(0, JOURNEY_SERIES)
+    .map(([key]) => key);
+  const series: JourneySeries[] = [
+    ...top.map((key) => ({ key, ...names.get(key)! })),
+    { key: 'OTHER', ticker: 'Λοιπά', instrumentName: null },
+  ];
+  const months: JourneyMonth[] = monthList.map((month) => {
+    const snap = snapshots.get(month) ?? new Map<string, Decimal>();
+    let total = new Decimal(0);
+    let other = new Decimal(0);
+    let positions = 0;
+    for (const [key, value] of snap) {
+      if (value.lte(0)) continue;
+      positions++;
+      total = total.plus(value);
+      if (!top.includes(key)) other = other.plus(value);
+    }
+    return {
+      month,
+      invested: total.toFixed(2),
+      values: [
+        ...top.map((key) => (snap.get(key) ?? new Decimal(0)).toFixed(2)),
+        other.toFixed(2),
+      ],
+      positions,
+    };
+  });
+
+  const byTime = [...entries].sort(
+    (a, b) => a.occurredAt.getTime() - b.occurredAt.getTime(),
+  );
+  const firstDeposit = byTime.find((e) => e.kind === 'DEPOSIT');
+  if (firstDeposit)
+    milestones.push({
+      kind: 'FIRST_DEPOSIT',
+      date: firstDeposit.occurredAt,
+      ticker: null,
+      isin: null,
+      instrumentName: null,
+      amount: new Decimal(firstDeposit.cashAmount).toFixed(2),
+      realisedPnl: null,
+      again: false,
+    });
+  const firstDividend = byTime.find(
+    (e) => e.kind === 'DIVIDEND' && e.sourceType !== 'DIVIDEND_ADJUSTMENT',
+  );
+  if (firstDividend)
+    milestones.push({
+      kind: 'FIRST_DIVIDEND',
+      date: firstDividend.occurredAt,
+      ticker: firstDividend.displayTicker ?? firstDividend.ticker,
+      isin: firstDividend.isin,
+      instrumentName: firstDividend.instrumentName,
+      amount: new Decimal(firstDividend.cashAmount).toFixed(2),
+      realisedPnl: null,
+      again: false,
+    });
+  for (const e of byTime)
+    if (e.kind === 'WITHDRAWAL')
+      milestones.push({
+        kind: 'WITHDRAWAL',
+        date: e.occurredAt,
+        ticker: null,
+        isin: null,
+        instrumentName: null,
+        amount: new Decimal(e.cashAmount).abs().toFixed(2),
+        realisedPnl: null,
+        again: false,
+      });
+
+  milestones.sort((a, b) => a.date.getTime() - b.date.getTime());
+  return { series, months, milestones };
 }
 
 function monthKey(timeZone: string): (date: Date) => string {
