@@ -13,7 +13,11 @@ import { Toasts } from '../../core/toasts';
   imports: [RouterLink],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <a routerLink="/" class="text-xs text-muted hover:text-ink">‹ Λογαριασμοί</a>
+    <a
+      routerLink="/"
+      class="-ml-1 inline-flex min-h-8 items-center px-1 text-sm text-muted hover:text-ink"
+      >‹ Λογαριασμοί</a
+    >
     <h1 class="text-2xl font-semibold tracking-tight">Ο λογαριασμός μου</h1>
 
     <div class="mt-6 grid max-w-2xl gap-5">

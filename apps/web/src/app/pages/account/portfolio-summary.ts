@@ -43,8 +43,9 @@ import { BREAKDOWN_TEXT, signedMoney, signedPct } from './portfolio-format';
               type="button"
               (click)="refresh.emit()"
               [disabled]="refreshing()"
-              class="flex items-center gap-1.5 text-xs text-muted hover:text-ink disabled:opacity-60"
+              class="-m-1 flex min-h-8 shrink-0 items-center gap-1.5 whitespace-nowrap px-1 text-xs text-muted hover:text-ink disabled:opacity-60"
               title="Ανανέωση τιμών"
+              [attr.aria-label]="'Ανανέωση τιμών, τελευταία ενημέρωση ' + timeOfDay(p.asOf)"
             >
               <span
                 class="size-1.5 rounded-full"
@@ -108,7 +109,7 @@ import { BREAKDOWN_TEXT, signedMoney, signedPct } from './portfolio-format';
                     [style.width.%]="barWidth(line.amount)"
                   ></div>
                 </div>
-                <p class="mt-1 text-[11px] leading-snug text-muted">{{ text[line.key].hint }}</p>
+                <p class="mt-1 text-xs leading-snug text-muted">{{ text[line.key].hint }}</p>
               </li>
             }
           </ul>

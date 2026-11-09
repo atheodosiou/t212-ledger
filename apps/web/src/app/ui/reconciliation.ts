@@ -24,7 +24,7 @@ import { dateTime, money } from '../core/format';
             ' ίδια με το Trading 212'
           "
         >
-          · ✓ Συμφωνεί με το Trading 212
+          <span class="max-sm:hidden" aria-hidden="true">·</span> ✓ Συμφωνεί με το Trading 212
           @if (c.stale) {
             <span class="text-muted">(νέος έλεγχος στο επόμενο sync)</span>
           }
@@ -35,7 +35,8 @@ import { dateTime, money } from '../core/format';
           fragment="checks"
           class="inline-flex items-center gap-1 font-medium text-loss hover:underline"
         >
-          · ⚠ {{ errors() }} {{ errors() === 1 ? 'διαφορά' : 'διαφορές' }} με το Trading 212
+          <span class="max-sm:hidden" aria-hidden="true">·</span> ⚠ {{ errors() }}
+          {{ errors() === 1 ? 'διαφορά' : 'διαφορές' }} με το Trading 212
         </a>
       }
     }
@@ -93,7 +94,7 @@ export class ReconciliationStatus {
               </li>
             }
           </ul>
-          <p class="mt-3 text-[11px] text-muted">Έλεγχος {{ dateTime(c.checkedAt) }}</p>
+          <p class="mt-3 text-xs text-muted">Έλεγχος {{ dateTime(c.checkedAt) }}</p>
         </section>
       }
     }

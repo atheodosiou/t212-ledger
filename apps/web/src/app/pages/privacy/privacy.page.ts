@@ -16,7 +16,11 @@ export const OPERATOR = {
     <article
       class="mx-auto max-w-2xl text-sm leading-relaxed [&_h2]:mt-6 [&_h2]:font-semibold [&_h2]:text-base [&_li]:ml-5 [&_li]:list-disc [&_p]:mt-2 [&_ul]:mt-2"
     >
-      <a routerLink="/" class="text-xs text-muted hover:text-ink">‹ Αρχική</a>
+      <a
+        routerLink="/"
+        class="-ml-1 inline-flex min-h-8 items-center px-1 text-sm text-muted hover:text-ink"
+        >‹ Αρχική</a
+      >
       <h1 class="text-2xl font-semibold tracking-tight">Απόρρητο</h1>
       <p class="text-muted">Τι κρατάμε, γιατί, για πόσο, και πώς το παίρνεις πίσω ή το σβήνεις.</p>
 

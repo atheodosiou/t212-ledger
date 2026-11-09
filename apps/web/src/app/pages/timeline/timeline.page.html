@@ -53,14 +53,15 @@
         <button
           type="button"
           (click)="showMonthTable.set(!showMonthTable())"
-          class="text-xs font-medium text-brand hover:underline"
+          [attr.aria-pressed]="showMonthTable()"
+          class="-m-2 min-h-10 shrink-0 px-2 text-sm font-medium text-brand hover:underline"
         >
           {{ showMonthTable() ? 'Γράφημα' : 'Πίνακας' }}
         </button>
       </div>
       @if (showMonthTable()) {
-        <div class="overflow-x-auto">
-          <table class="w-full min-w-[640px] text-sm">
+        <div class="sm:overflow-x-auto">
+          <table class="stack-table stack-flush w-full min-w-[640px] text-sm">
             <thead class="text-left text-xs text-muted">
               <tr>
                 <th class="py-2 pr-4 font-medium">Μήνας</th>
@@ -74,24 +75,29 @@
             <tbody class="divide-y divide-line">
               @for (m of data.months; track m.month) {
                 <tr>
-                  <td class="py-2 pr-4 capitalize">{{ monthName(m.month) }}</td>
-                  <td class="whitespace-nowrap py-2 pr-4 text-right">
+                  <td class="stack-title py-2 pr-4 font-medium capitalize sm:font-normal">
+                    {{ monthName(m.month) }}
+                  </td>
+                  <td data-label="Καταθέσεις" class="whitespace-nowrap py-2 pr-4 text-right">
                     {{ money(m.deposits, cur) }}
                   </td>
-                  <td class="whitespace-nowrap py-2 pr-4 text-right">
+                  <td data-label="Αγορές" class="whitespace-nowrap py-2 pr-4 text-right">
                     {{ money(m.purchases, cur) }} <span class="text-muted">({{ m.buys }})</span>
                   </td>
-                  <td class="whitespace-nowrap py-2 pr-4 text-right">
+                  <td data-label="Πωλήσεις" class="whitespace-nowrap py-2 pr-4 text-right">
                     {{ money(m.saleProceeds, cur) }} <span class="text-muted">({{ m.sells }})</span>
                   </td>
                   <td
+                    data-label="Αποτέλεσμα"
                     class="whitespace-nowrap py-2 pr-4 text-right font-medium"
                     [class.text-gain]="Number(m.realisedPnl) > 0"
                     [class.text-loss]="Number(m.realisedPnl) < 0"
                   >
                     {{ money(m.realisedPnl, cur) }}
                   </td>
-                  <td class="whitespace-nowrap py-2 text-right">{{ money(m.fees, cur) }}</td>
+                  <td data-label="Χρεώσεις" class="whitespace-nowrap py-2 text-right">
+                    {{ money(m.fees, cur) }}
+                  </td>
                 </tr>
               }
             </tbody>
@@ -158,8 +164,8 @@
           <app-instrument-chart [events]="item.events" [currency]="cur" />
         </div>
 
-        <div class="mt-5 overflow-x-auto">
-          <table class="w-full min-w-[680px] text-sm">
+        <div class="mt-5 sm:overflow-x-auto">
+          <table class="stack-table stack-flush w-full min-w-[680px] text-sm">
             <thead class="text-left text-xs text-muted">
               <tr>
                 <th class="py-2 pr-4 font-medium">Ημερομηνία</th>
@@ -174,11 +180,13 @@
             <tbody class="divide-y divide-line">
               @for (e of item.events; track e.entryId) {
                 <tr>
-                  <td class="whitespace-nowrap py-2 pr-4 text-muted">{{ date(e.date) }}</td>
-                  <td class="py-2 pr-4">
+                  <td data-label="Ημερομηνία" class="whitespace-nowrap py-2 pr-4 text-muted">
+                    {{ date(e.date) }}
+                  </td>
+                  <td class="stack-title py-2 pr-4 font-medium sm:font-normal">
                     <span class="inline-flex items-center gap-1.5">
                       <span
-                        class="text-[10px]"
+                        class="text-xs"
                         [style.color]="
                           e.kind === 'BUY' ? '#2a78d6' : e.kind === 'SELL' ? '#eb6834' : '#6b7280'
                         "
@@ -190,17 +198,23 @@
                       }}
                     </span>
                   </td>
-                  <td class="whitespace-nowrap py-2 pr-4 text-right">{{ qty(e.quantity) }}</td>
-                  <td class="whitespace-nowrap py-2 pr-4 text-right">
+                  <td data-label="Μετοχές" class="whitespace-nowrap py-2 pr-4 text-right">
+                    {{ qty(e.quantity) }}
+                  </td>
+                  <td data-label="Τιμή ανά μετοχή" class="whitespace-nowrap py-2 pr-4 text-right">
                     {{ money(e.pricePerShare, cur) }}
                   </td>
-                  <td class="whitespace-nowrap py-2 pr-4 text-right">
+                  <td data-label="Θέση μετά" class="whitespace-nowrap py-2 pr-4 text-right">
                     {{ qty(e.positionQuantity) }}
                   </td>
-                  <td class="whitespace-nowrap py-2 pr-4 text-right font-medium">
+                  <td
+                    data-label="Μέση τιμή μετά"
+                    class="whitespace-nowrap py-2 pr-4 text-right font-medium"
+                  >
                     {{ e.averageCost ? money(e.averageCost, cur) : '—' }}
                   </td>
                   <td
+                    data-label="Αποτέλεσμα"
                     class="whitespace-nowrap py-2 text-right"
                     [class.text-gain]="Number(e.realisedPnl) > 0"
                     [class.text-loss]="Number(e.realisedPnl) < 0"

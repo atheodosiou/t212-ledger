@@ -32,7 +32,7 @@ const METHODS: { value: CostMethod; label: string; hint: string }[] = [
         <button
           type="button"
           [attr.popovertarget]="infoId"
-          class="info-trigger grid size-5 place-items-center rounded-full text-muted transition hover:bg-line/60 hover:text-ink focus-visible:outline-2 focus-visible:outline-brand"
+          class="info-trigger -my-1 grid size-6 place-items-center rounded-full text-muted transition hover:bg-line/60 hover:text-ink focus-visible:outline-2 focus-visible:outline-brand"
           aria-label="Τι είναι η μέθοδος κόστους;"
         >
           <svg viewBox="0 0 20 20" class="size-3.5" aria-hidden="true">
@@ -74,7 +74,7 @@ const METHODS: { value: CostMethod; label: string; hint: string }[] = [
           <dt class="font-medium">
             Μέση τιμή κτήσης
             <span
-              class="ml-1 rounded-full bg-emerald-100 px-1.5 py-0.5 text-[11px] font-medium text-emerald-800"
+              class="ml-1 rounded-full bg-emerald-100 px-1.5 py-0.5 text-xs font-medium text-emerald-800"
               >αυτή χρησιμοποιεί το Trading 212</span
             >
           </dt>

@@ -20,8 +20,8 @@ type PositionSort = 'ticker' | 'quantity' | 'value' | 'cost' | 'result' | 'resul
           <span class="font-normal text-muted">· {{ positions().length }}</span>
         }
       </h2>
-      <div class="overflow-x-auto lg:overflow-visible">
-        <table class="w-full min-w-[760px] text-sm">
+      <div class="sm:overflow-x-auto lg:overflow-visible">
+        <table class="stack-table w-full min-w-[760px] text-sm">
           <thead
             class="sticky-head bg-canvas text-left text-xs text-muted shadow-[0_1px_0_var(--color-line)]"
           >
@@ -95,38 +95,48 @@ type PositionSort = 'ticker' | 'quantity' | 'value' | 'cost' | 'result' | 'resul
             <tbody class="divide-y divide-line">
               @for (pos of sorted(); track pos.isin ?? pos.ticker) {
                 <tr class="hover:bg-canvas/60">
-                  <td class="px-5 py-2.5">
+                  <td class="stack-title px-5 py-2.5">
                     <span class="font-medium">{{ ticker(pos.ticker) }}</span>
                     <span class="ml-1 text-muted">{{ pos.instrumentName }}</span>
                   </td>
-                  <td class="whitespace-nowrap px-4 py-2.5 text-right">{{ qty(pos.quantity) }}</td>
-                  <td class="whitespace-nowrap px-4 py-2.5 text-right text-muted">
+                  <td data-label="Μετοχές" class="whitespace-nowrap px-4 py-2.5 text-right">
+                    {{ qty(pos.quantity) }}
+                  </td>
+                  <td data-label="Τιμή" class="whitespace-nowrap px-4 py-2.5 text-right text-muted">
                     {{ price(pos.currentPrice) }} {{ pos.instrumentCurrency }}
                   </td>
-                  <td class="whitespace-nowrap px-4 py-2.5 text-right font-medium">
+                  <td
+                    data-label="Αξία"
+                    class="whitespace-nowrap px-4 py-2.5 text-right font-medium"
+                  >
                     {{ money(pos.value, currency()) }}
                   </td>
-                  <td class="whitespace-nowrap px-4 py-2.5 text-right text-muted">
+                  <td
+                    data-label="Κόστος"
+                    class="whitespace-nowrap px-4 py-2.5 text-right text-muted"
+                  >
                     {{ money(pos.cost, currency()) }}
                   </td>
-                  <td class="whitespace-nowrap px-4 py-2.5 text-right">
-                    <span
-                      class="font-medium"
-                      [class.text-gain]="Number(pos.result) > 0"
-                      [class.text-loss]="Number(pos.result) < 0"
-                    >
-                      {{ signedMoney(pos.result, currency()) }}
-                      @if (pos.resultPct !== null) {
-                        <span class="text-xs">({{ signedPct(pos.resultPct) }}%)</span>
+                  <td data-label="Αποτέλεσμα" class="whitespace-nowrap px-4 py-2.5 text-right">
+                    <span>
+                      <span
+                        class="font-medium"
+                        [class.text-gain]="Number(pos.result) > 0"
+                        [class.text-loss]="Number(pos.result) < 0"
+                      >
+                        {{ signedMoney(pos.result, currency()) }}
+                        @if (pos.resultPct !== null) {
+                          <span class="text-xs">({{ signedPct(pos.resultPct) }}%)</span>
+                        }
+                      </span>
+                      @if (pos.fxImpact !== null && Number(pos.fxImpact) !== 0) {
+                        <span class="block text-xs text-muted">
+                          εκ των οποίων από την ισοτιμία {{ signedMoney(pos.fxImpact, currency()) }}
+                        </span>
                       }
                     </span>
-                    @if (pos.fxImpact !== null && Number(pos.fxImpact) !== 0) {
-                      <span class="block text-[11px] text-muted">
-                        εκ των οποίων από την ισοτιμία {{ signedMoney(pos.fxImpact, currency()) }}
-                      </span>
-                    }
                   </td>
-                  <td class="whitespace-nowrap px-5 py-2.5 text-right">
+                  <td data-label="Βάρος" class="whitespace-nowrap px-5 py-2.5 text-right">
                     <span class="inline-flex items-center gap-2">
                       <span
                         class="hidden h-1.5 w-12 rounded-full bg-canvas sm:inline-block"
@@ -150,28 +160,32 @@ type PositionSort = 'ticker' | 'quantity' | 'value' | 'cost' | 'result' | 'resul
             @if (positions().length) {
               <tfoot class="border-t border-line bg-canvas/60 text-sm font-medium">
                 <tr>
-                  <td class="px-5 py-2.5" colspan="3">Σύνολο</td>
-                  <td class="whitespace-nowrap px-4 py-2.5 text-right">
+                  <td class="stack-title px-5 py-2.5" colspan="3">Σύνολο</td>
+                  <td data-label="Αξία" class="whitespace-nowrap px-4 py-2.5 text-right">
                     {{ money(totals().value, currency()) }}
                   </td>
-                  <td class="whitespace-nowrap px-4 py-2.5 text-right text-muted">
+                  <td
+                    data-label="Κόστος"
+                    class="whitespace-nowrap px-4 py-2.5 text-right text-muted"
+                  >
                     {{ money(totals().cost, currency()) }}
                   </td>
                   <td
+                    data-label="Αποτέλεσμα"
                     class="whitespace-nowrap px-4 py-2.5 text-right"
                     [class.text-gain]="Number(totals().result) > 0"
                     [class.text-loss]="Number(totals().result) < 0"
                   >
                     {{ signedMoney(totals().result, currency()) }}
                   </td>
-                  <td class="px-5 py-2.5"></td>
+                  <td class="hidden px-5 py-2.5 sm:table-cell"></td>
                 </tr>
               </tfoot>
             }
           }
         </table>
       </div>
-      <p class="px-5 py-3 text-[11px] text-muted">
+      <p class="px-5 py-3 text-xs text-muted">
         Κόστος με τις χρεώσεις αγοράς. Τιμές από το Trading 212, ανανεώνονται κάθε λεπτό.
       </p>
     </section>

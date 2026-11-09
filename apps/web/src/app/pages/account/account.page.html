@@ -3,7 +3,8 @@
 <div stickyTop class="-mx-4 border-b border-line bg-canvas/95 px-4 backdrop-blur">
   <app-account-header [state]="state" [accountId]="id()" active="overview" />
   @if (collapsed() && portfolioValue() && !state.syncing()) {
-    <app-summary-bar class="mt-2" [data]="portfolioValue()!" (expand)="expand()" />
+    <!-- Only where the top stays in view (tablet and up); on a phone it would scroll away. -->
+    <app-summary-bar class="mt-2 hidden md:block" [data]="portfolioValue()!" (expand)="expand()" />
   }
 </div>
 

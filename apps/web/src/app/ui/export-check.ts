@@ -23,12 +23,14 @@ const KIND_LABEL: Record<ExportCheckDto['differences'][number]['kind'], string> 
     @let c = check();
     @if (s?.running; as r) {
       <span class="inline-flex items-center gap-1 text-muted">
-        · <span class="size-2 animate-pulse rounded-full bg-brand"></span> Λήψη export
+        <span class="max-sm:hidden" aria-hidden="true">·</span>
+        <span class="size-2 animate-pulse rounded-full bg-brand"></span> Λήψη export
         {{ r.year }} από το Trading 212…
       </span>
     } @else if (s?.blocked?.reason === 'permission' || s?.blocked?.reason === 'error') {
       <span class="text-amber-700" [title]="s!.blocked!.message"
-        >· ⚠ Χωρίς export του Trading 212</span
+        ><span class="max-sm:hidden" aria-hidden="true">·</span> ⚠ Χωρίς export του Trading
+        212</span
       >
     } @else if (c) {
       @if (c.ok) {
@@ -44,7 +46,10 @@ const KIND_LABEL: Record<ExportCheckDto['differences'][number]['kind'], string> 
             ' κινήσεις μετρητών. Έλεγχος ' +
             dateTime(c.checkedAt)
           "
-          >· ✓ Ίδιο με το export ({{ total() }} εγγραφές)</span
+          ><span class="max-sm:hidden" aria-hidden="true">·</span> ✓ Ίδιο με το export ({{
+            total()
+          }}
+          εγγραφές)</span
         >
       } @else {
         <a
@@ -52,7 +57,8 @@ const KIND_LABEL: Record<ExportCheckDto['differences'][number]['kind'], string> 
           fragment="export-check"
           class="font-medium text-loss hover:underline"
         >
-          · ⚠ {{ count() }} {{ count() === 1 ? 'διαφορά' : 'διαφορές' }} με το export
+          <span class="max-sm:hidden" aria-hidden="true">·</span> ⚠ {{ count() }}
+          {{ count() === 1 ? 'διαφορά' : 'διαφορές' }} με το export
         </a>
       }
     }

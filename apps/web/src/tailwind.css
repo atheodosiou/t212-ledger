@@ -8,7 +8,8 @@
   --color-canvas: #f6f7f9;
   --color-surface: #ffffff;
   --color-ink: #111827;
-  --color-muted: #6b7280;
+  /* 5.3:1 on white and 5:1 on the canvas: readable small text (WCAG AA needs 4.5:1). */
+  --color-muted: #5b6270;
   --color-line: #e5e7eb;
   --color-brand: #0f766e;
   --color-brand-strong: #115e59;
@@ -23,6 +24,35 @@
       'tnum' 1,
       'cv11' 1;
   }
+
+  /* A visible focus ring for keyboard users everywhere, in the brand colour. */
+  :focus-visible {
+    outline: 2px solid var(--color-brand);
+    outline-offset: 2px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    ::before,
+    ::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+/*
+ * Phones zoom into any field under 16px when it gets focus; keep fields at 16px there.
+ * Outside the layers, so it wins over text-sm on the fields themselves.
+ */
+@media (width < 40rem) {
+  input:not([type='checkbox'], [type='radio']),
+  select,
+  textarea {
+    font-size: 1rem !important;
+  }
 }
 
 :root {
@@ -34,4 +64,93 @@
   position: sticky;
   top: var(--sticky-bottom);
   z-index: 10;
+}
+
+/*
+ * Tables on phones: each row becomes a card. The cell marked .stack-title heads the
+ * card; every other cell shows its data-label on the left and its value on the right.
+ * The header row stays, as a scrollable row of sort buttons.
+ */
+@media (width < 40rem) {
+  .stack-table {
+    display: block;
+    min-width: 0 !important;
+  }
+  .stack-table thead,
+  .stack-table tbody,
+  .stack-table tfoot {
+    display: block;
+  }
+  .stack-table thead tr {
+    display: flex;
+    gap: 0.375rem;
+    overflow-x: auto;
+    padding: 0.5rem 0.75rem;
+    scrollbar-width: none;
+  }
+  .stack-table thead th {
+    display: block;
+    flex: none;
+    padding: 0 !important;
+    text-align: left !important;
+  }
+  /* Columns that cannot be sorted add nothing to the sort row. */
+  .stack-table thead th:not([aria-sort]) {
+    display: none;
+  }
+  .stack-table thead th button {
+    flex-direction: row !important;
+    min-height: 2rem;
+    padding: 0.25rem 0.75rem;
+    border: 1px solid var(--color-line);
+    border-radius: 9999px;
+    background: var(--color-surface);
+    white-space: nowrap;
+  }
+  .stack-table thead th[aria-sort='ascending'] button,
+  .stack-table thead th[aria-sort='descending'] button {
+    border-color: var(--color-brand);
+    color: var(--color-ink);
+  }
+  .stack-table tbody tr,
+  .stack-table tfoot tr {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    padding: 0.75rem 1rem;
+  }
+  /* Inside a padded card already. */
+  .stack-table.stack-flush tbody tr {
+    padding-inline: 0;
+  }
+  .stack-table tbody td,
+  .stack-table tfoot td {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0 !important;
+    text-align: right;
+    white-space: normal;
+  }
+  .stack-table td[data-label]::before {
+    content: attr(data-label);
+    flex: none;
+    color: var(--color-muted);
+    font-weight: 400;
+    text-align: left;
+  }
+  .stack-table td.stack-title {
+    order: -1;
+    display: block;
+    text-align: left;
+  }
+  /* Empty cells (no fee, no price) would only add a bare label. */
+  .stack-table td[data-label]:empty,
+  .stack-table td[data-label]:has(> :empty:only-child) {
+    display: none;
+  }
+  .stack-table td[colspan]:not(.stack-title) {
+    display: block;
+    text-align: center;
+  }
 }

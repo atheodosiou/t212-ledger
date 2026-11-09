@@ -28,12 +28,12 @@ import type { SortDir } from '@t212/shared';
     <button
       type="button"
       (click)="toggle()"
-      class="inline-flex items-center gap-1 font-medium hover:text-ink"
+      class="inline-flex min-h-6 items-center gap-1 font-medium hover:text-ink"
       [class.text-ink]="active()"
       [class.flex-row-reverse]="align() === 'right'"
     >
       <ng-content />
-      <span class="w-3 text-[10px]" aria-hidden="true">
+      <span class="w-3 text-xs" aria-hidden="true">
         {{ active() ? (dir() === 'asc' ? '▲' : '▼') : '↕' }}
       </span>
     </button>
@@ -109,10 +109,12 @@ export class NearEnd {
 const APP_HEADER_PX = 56;
 
 /**
- * Marks the sticky block at the top of a page and publishes where it ends as the
- * CSS variable --sticky-bottom, so table headers can stick right below it.
+ * Marks the block at the top of a page that stays in view while scrolling, from tablet
+ * width up: on a phone it would take half the screen, so there it scrolls away. Publishes
+ * where the sticky part of the page ends as --sticky-bottom, so table headers stick
+ * right below it.
  */
-@Directive({ selector: '[stickyTop]', host: { class: 'sticky z-20', '[style.top.px]': 'top' } })
+@Directive({ selector: '[stickyTop]', host: { class: 'md:sticky z-20', '[style.top.px]': 'top' } })
 export class StickyTop {
   protected readonly top = APP_HEADER_PX;
 
@@ -121,13 +123,22 @@ export class StickyTop {
     const root = document.documentElement;
     const destroyRef = inject(DestroyRef);
     afterNextRender(() => {
-      const publish = () =>
-        root.style.setProperty('--sticky-bottom', `${APP_HEADER_PX + element.offsetHeight}px`);
+      const publish = () => {
+        const sticky = getComputedStyle(element).position === 'sticky';
+        root.style.setProperty(
+          '--sticky-bottom',
+          `${APP_HEADER_PX + (sticky ? element.offsetHeight : 0)}px`,
+        );
+      };
       publish();
       const observer = new ResizeObserver(publish);
       observer.observe(element);
+      // Crossing the tablet width turns stickiness on or off.
+      const wide = matchMedia('(width >= 48rem)');
+      wide.addEventListener('change', publish);
       destroyRef.onDestroy(() => {
         observer.disconnect();
+        wide.removeEventListener('change', publish);
         root.style.setProperty('--sticky-bottom', `${APP_HEADER_PX}px`);
       });
     });

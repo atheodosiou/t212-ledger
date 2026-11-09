@@ -28,6 +28,7 @@ import {
   dateTime,
   KIND_LABEL,
   money,
+  price,
   qty,
   sumMoney,
   taxYear,
@@ -313,6 +314,7 @@ export class AccountantPage {
   protected readonly kindLabel = KIND_LABEL;
   protected readonly money = money;
   protected readonly qty = qty;
+  protected readonly price = price;
   protected readonly date = date;
   protected readonly dateTime = dateTime;
   protected readonly ticker = ticker;

@@ -52,18 +52,13 @@ const axisDate = new Intl.DateTimeFormat('el-GR', {
           [attr.y]="t.y"
           dy="0.32em"
           text-anchor="end"
-          class="fill-muted text-[11px]"
+          class="fill-muted text-xs"
         >
           {{ t.label }}
         </text>
       }
       @for (t of geometry().xTicks; track t.x) {
-        <text
-          [attr.x]="t.x"
-          [attr.y]="height - 8"
-          text-anchor="middle"
-          class="fill-muted text-[11px]"
-        >
+        <text [attr.x]="t.x" [attr.y]="height - 8" text-anchor="middle" class="fill-muted text-xs">
           {{ t.label }}
         </text>
       }

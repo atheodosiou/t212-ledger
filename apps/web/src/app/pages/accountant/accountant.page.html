@@ -5,7 +5,7 @@
   <app-account-header [state]="state" [accountId]="id()" active="accountant" />
 
   <!-- Toolbar: everything on this page follows these choices -->
-  <div class="flex flex-wrap items-end justify-between gap-3 py-3">
+  <div class="grid gap-3 py-3 sm:flex sm:flex-wrap sm:items-end sm:justify-between">
     <div class="flex flex-wrap items-end gap-3">
       <label class="text-xs">
         <span class="block font-medium text-muted">Περίοδος</span>
@@ -23,7 +23,7 @@
       </label>
       <app-cost-method-picker [(method)]="method" />
     </div>
-    <div class="flex gap-2">
+    <div class="grid grid-cols-2 gap-2 sm:flex">
       <button
         type="button"
         (click)="download('xlsx')"
@@ -106,7 +106,7 @@
           <dt class="text-xs text-muted">
             {{ t.label }}
             @if (t.hint) {
-              <span class="block text-[11px] opacity-80">{{ t.hint }}</span>
+              <span class="block text-xs opacity-80">{{ t.hint }}</span>
             }
           </dt>
           @if (cardsLoading() || !summary()) {
@@ -114,7 +114,7 @@
           } @else {
             <dd class="mt-1 font-semibold">{{ money(summary()![t.field], cur) }}</dd>
             @if (t.field === 'dividends' && dividendTax(); as dt) {
-              <p class="mt-1 text-[11px] leading-snug text-muted">
+              <p class="mt-1 text-xs leading-snug text-muted">
                 @let approx = dt.estimated ? '~' : '';
                 <span class="block">μικτά {{ approx }}{{ money(dt.gross, cur) }}</span>
                 <span class="block whitespace-nowrap"
@@ -165,14 +165,17 @@
 <!-- Tables -->
 <section class="mt-8 rounded-xl border border-line bg-surface">
   <div class="flex flex-wrap items-center justify-between gap-3 border-b border-line px-3 pt-2">
-    <div role="tablist" class="flex gap-1">
+    <div
+      role="group"
+      aria-label="Πίνακες"
+      class="-mx-3 flex gap-1 overflow-x-auto px-3 [scrollbar-width:none] sm:mx-0 sm:px-0"
+    >
       @for (t of tabs; track t.id) {
         <button
           type="button"
-          role="tab"
-          [attr.aria-selected]="tab() === t.id"
+          [attr.aria-pressed]="tab() === t.id"
           (click)="tab.set(t.id)"
-          class="-mb-px border-b-2 px-3 py-2 text-sm font-medium transition"
+          class="-mb-px min-h-11 whitespace-nowrap border-b-2 px-3 text-sm font-medium transition"
           [class]="
             tab() === t.id
               ? 'border-brand text-ink'
@@ -183,7 +186,7 @@
         </button>
       }
     </div>
-    <div class="flex flex-wrap gap-2 pb-2">
+    <div class="flex w-full flex-wrap gap-2 pb-3 sm:w-auto sm:pb-2">
       @if (tab() === 'entries') {
         <select
           [value]="kindFilter()"
@@ -203,16 +206,16 @@
         (input)="search.set($any($event.target).value)"
         placeholder="Αναζήτηση τίτλου ή ISIN"
         aria-label="Αναζήτηση τίτλου ή ISIN"
-        class="w-56 rounded-lg border border-line px-3 py-1.5 text-sm"
+        class="min-w-0 flex-1 rounded-lg border border-line px-3 py-1.5 text-sm sm:w-56 sm:flex-none"
       />
     </div>
   </div>
 
-  <div class="overflow-x-auto lg:overflow-visible">
+  <div class="sm:overflow-x-auto lg:overflow-visible">
     @switch (tab()) {
       @case ('sales') {
         @let list = sales;
-        <table class="w-full min-w-[820px] text-sm">
+        <table class="stack-table w-full min-w-[820px] text-sm">
           <thead
             class="sticky-head bg-canvas text-left text-xs text-muted shadow-[0_1px_0_var(--color-line)]"
           >
@@ -295,26 +298,34 @@
             <tbody class="divide-y divide-line">
               @for (s of list.items(); track s.entryId) {
                 <tr class="hover:bg-canvas/60">
-                  <td class="whitespace-nowrap px-4 py-2 text-muted">{{ date(s.date) }}</td>
-                  <td class="px-4 py-2">
+                  <td data-label="Ημερομηνία" class="whitespace-nowrap px-4 py-2 text-muted">
+                    {{ date(s.date) }}
+                  </td>
+                  <td class="stack-title px-4 py-2">
                     <span class="font-medium">{{ ticker(s.ticker) }}</span>
                     <span class="ml-1 text-muted">{{ s.instrumentName }}</span>
                   </td>
-                  <td class="whitespace-nowrap px-4 py-2 text-right">{{ qty(s.quantity) }}</td>
-                  <td class="whitespace-nowrap px-4 py-2 text-right">
+                  <td data-label="Μετοχές" class="whitespace-nowrap px-4 py-2 text-right">
+                    {{ qty(s.quantity) }}
+                  </td>
+                  <td data-label="Έσοδα" class="whitespace-nowrap px-4 py-2 text-right">
                     {{ money(s.proceeds, cur) }}
                   </td>
-                  <td class="whitespace-nowrap px-4 py-2 text-right">
+                  <td data-label="Κόστος" class="whitespace-nowrap px-4 py-2 text-right">
                     {{ money(s.costBasis, cur) }}
                   </td>
                   <td
+                    data-label="Αποτέλεσμα"
                     class="whitespace-nowrap px-4 py-2 text-right font-medium"
                     [class.text-gain]="Number(s.realisedPnl) > 0"
                     [class.text-loss]="Number(s.realisedPnl) < 0"
                   >
                     {{ money(s.realisedPnl, cur) }}
                   </td>
-                  <td class="whitespace-nowrap px-4 py-2 text-right text-muted">
+                  <td
+                    data-label="Κατά Trading 212"
+                    class="whitespace-nowrap px-4 py-2 text-right text-muted"
+                  >
                     {{ money(s.brokerRealisedPnl, cur) }}
                   </td>
                 </tr>
@@ -335,21 +346,27 @@
               @if (list.items().length) {
                 <tfoot class="border-t border-line bg-canvas/60 font-medium">
                   <tr>
-                    <td class="px-4 py-2.5" colspan="3">Σύνολο ({{ list.total() }} πωλήσεις)</td>
-                    <td class="whitespace-nowrap px-4 py-2.5 text-right">
+                    <td class="stack-title px-4 py-2.5" colspan="3">
+                      Σύνολο ({{ list.total() }} πωλήσεις)
+                    </td>
+                    <td data-label="Έσοδα" class="whitespace-nowrap px-4 py-2.5 text-right">
                       {{ money(t.proceeds, cur) }}
                     </td>
-                    <td class="whitespace-nowrap px-4 py-2.5 text-right">
+                    <td data-label="Κόστος" class="whitespace-nowrap px-4 py-2.5 text-right">
                       {{ money(t.costBasis, cur) }}
                     </td>
                     <td
+                      data-label="Αποτέλεσμα"
                       class="whitespace-nowrap px-4 py-2.5 text-right"
                       [class.text-gain]="Number(t.realisedPnl) > 0"
                       [class.text-loss]="Number(t.realisedPnl) < 0"
                     >
                       {{ money(t.realisedPnl, cur) }}
                     </td>
-                    <td class="whitespace-nowrap px-4 py-2.5 text-right text-muted">
+                    <td
+                      data-label="Κατά Trading 212"
+                      class="whitespace-nowrap px-4 py-2.5 text-right text-muted"
+                    >
                       {{ money(t.brokerRealisedPnl, cur) }}
                     </td>
                   </tr>
@@ -363,7 +380,7 @@
 
       @case ('entries') {
         @let list = entries;
-        <table class="w-full min-w-[820px] text-sm">
+        <table class="stack-table w-full min-w-[820px] text-sm">
           <thead
             class="sticky-head bg-canvas text-left text-xs text-muted shadow-[0_1px_0_var(--color-line)]"
           >
@@ -445,26 +462,34 @@
             <tbody class="divide-y divide-line">
               @for (e of list.items(); track e.id) {
                 <tr class="hover:bg-canvas/60">
-                  <td class="whitespace-nowrap px-4 py-2 text-muted">
+                  <td data-label="Ημερομηνία" class="whitespace-nowrap px-4 py-2 text-muted">
                     {{ dateTime(e.occurredAt) }}
                   </td>
-                  <td class="whitespace-nowrap px-4 py-2">{{ kindLabel[e.kind] }}</td>
-                  <td class="px-4 py-2">
+                  <td class="stack-title whitespace-nowrap px-4 py-2 font-medium sm:font-normal">
+                    {{ kindLabel[e.kind] }}
+                  </td>
+                  <td data-label="Τίτλος" class="px-4 py-2">
                     @if (e.ticker) {
                       <span class="font-medium">{{ ticker(e.displayTicker ?? e.ticker) }}</span>
                       <span class="ml-1 text-muted">{{ e.instrumentName }}</span>
                     }
                   </td>
-                  <td class="whitespace-nowrap px-4 py-2 text-right">{{ qty(e.quantity) }}</td>
-                  <td class="whitespace-nowrap px-4 py-2 text-right text-muted">
+                  <td data-label="Μετοχές" class="whitespace-nowrap px-4 py-2 text-right">
+                    {{ qty(e.quantity) }}
+                  </td>
+                  <td data-label="Τιμή" class="whitespace-nowrap px-4 py-2 text-right text-muted">
                     @if (e.price) {
-                      {{ qty(e.price) }} {{ e.instrumentCurrency }}
+                      {{ price(e.price) }} {{ e.instrumentCurrency }}
                     }
                   </td>
-                  <td class="whitespace-nowrap px-4 py-2 text-right text-muted">
+                  <td
+                    data-label="Χρεώσεις"
+                    class="whitespace-nowrap px-4 py-2 text-right text-muted"
+                  >
                     {{ Number(e.fees) ? money(e.fees, cur) : '' }}
                   </td>
                   <td
+                    data-label="Ποσό"
                     class="whitespace-nowrap px-4 py-2 text-right font-medium"
                     [class.text-gain]="Number(e.cashAmount) > 0"
                     [class.text-loss]="Number(e.cashAmount) < 0"
@@ -491,7 +516,7 @@
       }
 
       @case ('holdings') {
-        <table class="w-full min-w-[640px] text-sm">
+        <table class="stack-table w-full min-w-[640px] text-sm">
           <thead
             class="sticky-head bg-canvas text-left text-xs text-muted shadow-[0_1px_0_var(--color-line)]"
           >
@@ -545,16 +570,23 @@
             <tbody class="divide-y divide-line">
               @for (h of holdings(); track h.isin ?? h.ticker) {
                 <tr class="hover:bg-canvas/60">
-                  <td class="px-4 py-2">
+                  <td class="stack-title px-4 py-2">
                     <span class="font-medium">{{ ticker(h.ticker) }}</span>
                     <span class="ml-1 text-muted">{{ h.instrumentName }}</span>
                   </td>
-                  <td class="px-4 py-2 font-mono text-xs text-muted">{{ h.isin }}</td>
-                  <td class="whitespace-nowrap px-4 py-2 text-right">{{ qty(h.quantity) }}</td>
-                  <td class="whitespace-nowrap px-4 py-2 text-right">
+                  <td data-label="ISIN" class="px-4 py-2 font-mono text-xs text-muted">
+                    {{ h.isin }}
+                  </td>
+                  <td data-label="Μετοχές" class="whitespace-nowrap px-4 py-2 text-right">
+                    {{ qty(h.quantity) }}
+                  </td>
+                  <td data-label="Μέση τιμή" class="whitespace-nowrap px-4 py-2 text-right">
                     {{ money(h.averageCost, cur) }}
                   </td>
-                  <td class="whitespace-nowrap px-4 py-2 text-right font-medium">
+                  <td
+                    data-label="Κόστος κτήσης"
+                    class="whitespace-nowrap px-4 py-2 text-right font-medium"
+                  >
                     {{ money(h.costBasis, cur) }}
                   </td>
                 </tr>
