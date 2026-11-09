@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, input, signal } from '@angular/core';
 import type { LivePositionDto, SortDir } from '@t212/shared';
-import { money, qty, sumMoney, ticker } from '../../core/format';
+import { money, price, qty, sumMoney, ticker } from '../../core/format';
 import { SkeletonRows, SortHeader } from '../../ui/table';
 import { signedMoney, signedPct } from './portfolio-format';
 
@@ -101,7 +101,7 @@ type PositionSort = 'ticker' | 'quantity' | 'value' | 'cost' | 'result' | 'resul
                   </td>
                   <td class="whitespace-nowrap px-4 py-2.5 text-right">{{ qty(pos.quantity) }}</td>
                   <td class="whitespace-nowrap px-4 py-2.5 text-right text-muted">
-                    {{ qty(pos.currentPrice) }} {{ pos.instrumentCurrency }}
+                    {{ price(pos.currentPrice) }} {{ pos.instrumentCurrency }}
                   </td>
                   <td class="whitespace-nowrap px-4 py-2.5 text-right font-medium">
                     {{ money(pos.value, currency()) }}
@@ -122,7 +122,7 @@ type PositionSort = 'ticker' | 'quantity' | 'value' | 'cost' | 'result' | 'resul
                     </span>
                     @if (pos.fxImpact !== null && Number(pos.fxImpact) !== 0) {
                       <span class="block text-[11px] text-muted">
-                        εκ των οποίων συνάλλαγμα {{ signedMoney(pos.fxImpact, currency()) }}
+                        εκ των οποίων από την ισοτιμία {{ signedMoney(pos.fxImpact, currency()) }}
                       </span>
                     }
                   </td>
@@ -207,6 +207,7 @@ export class PositionsTable {
 
   protected readonly money = money;
   protected readonly qty = qty;
+  protected readonly price = price;
   protected readonly ticker = ticker;
   protected readonly signedMoney = signedMoney;
   protected readonly signedPct = signedPct;

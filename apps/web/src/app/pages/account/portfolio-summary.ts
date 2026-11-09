@@ -35,7 +35,7 @@ import { BREAKDOWN_TEXT, signedMoney, signedPct } from './portfolio-format';
     } @else {
       @let p = data()!;
       @let c = p.currency;
-      <div class="grid gap-3 lg:grid-cols-[1fr_1.3fr]">
+      <div class="grid gap-3 lg:grid-cols-[1fr_1.3fr] lg:items-start">
         <section class="rounded-xl border border-line bg-surface p-5" aria-labelledby="now-title">
           <div class="flex items-start justify-between gap-3">
             <h2 id="now-title" class="text-sm text-muted">Αξία χαρτοφυλακίου τώρα</h2>
@@ -58,7 +58,8 @@ import { BREAKDOWN_TEXT, signedMoney, signedPct } from './portfolio-format';
           <dl class="mt-5 space-y-2 text-sm">
             <div class="flex justify-between gap-4">
               <dt class="text-muted">
-                Έβαλες συνολικά <span class="text-xs">(καταθέσεις − αναλήψεις)</span>
+                Έβαλες συνολικά
+                <span class="text-xs">(καταθέσεις με τις χρεώσεις κάρτας − αναλήψεις)</span>
               </dt>
               <dd class="font-medium">{{ money(p.netDeposits, c) }}</dd>
             </div>

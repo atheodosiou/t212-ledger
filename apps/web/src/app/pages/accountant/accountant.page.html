@@ -21,22 +21,7 @@
           <option value="all">Όλο το ιστορικό</option>
         </select>
       </label>
-      <fieldset class="text-xs">
-        <legend class="font-medium text-muted">Μέθοδος κόστους</legend>
-        <div class="mt-1 inline-flex rounded-lg border border-line bg-surface p-0.5">
-          @for (m of ['AVERAGE', 'FIFO']; track m) {
-            <button
-              type="button"
-              (click)="method.set($any(m))"
-              [attr.aria-pressed]="method() === m"
-              class="rounded-md px-3 py-1 text-sm transition"
-              [class]="method() === m ? 'bg-brand text-white' : 'text-muted hover:text-ink'"
-            >
-              {{ m === 'AVERAGE' ? 'Μέση τιμή' : 'FIFO' }}
-            </button>
-          }
-        </div>
-      </fieldset>
+      <app-cost-method-picker [(method)]="method" />
     </div>
     <div class="flex gap-2">
       <a
@@ -71,7 +56,7 @@
 }
 
 <!-- Period figures -->
-<div class="mt-6 grid gap-3 lg:grid-cols-[1.2fr_2fr]">
+<div class="mt-6 grid gap-3 lg:grid-cols-[1.2fr_2fr] lg:items-start">
   <section class="rounded-xl border border-line bg-surface p-5">
     @if (cardsLoading() || !summary()) {
       <div aria-hidden="true">
@@ -93,7 +78,8 @@
         {{ money(s.realisedPnl, cur) }}
       </p>
       <p class="mt-1 text-xs text-muted">
-        Μόνο όσα πούλησες μέσα στην περίοδο, με τις χρεώσεις. Δεν περιλαμβάνει όσα κρατάς ακόμα.
+        Μόνο όσα πούλησες μέσα στην περίοδο, μετά τις χρεώσεις μετατροπής νομίσματος. Όσα κρατάς
+        ακόμα δεν μετράνε εδώ.
       </p>
       @if (brokerComparison(); as c) {
         <div class="mt-4 rounded-lg bg-canvas p-3 text-xs leading-relaxed">
@@ -130,8 +116,10 @@
             @if (t.field === 'dividends' && dividendTax(); as dt) {
               <p class="mt-1 text-[11px] leading-snug text-muted">
                 @let approx = dt.estimated ? '~' : '';
-                μικτά {{ approx }}{{ money(dt.gross, cur) }} · φόρος εξωτ. {{ approx
-                }}{{ money(dt.withheld, cur) }}
+                <span class="block">μικτά {{ approx }}{{ money(dt.gross, cur) }}</span>
+                <span class="block whitespace-nowrap"
+                  >φόρος εξωτερικού {{ approx }}{{ money(dt.withheld, cur) }}</span
+                >
                 <span class="block">{{
                   dt.estimated
                     ? 'εκτίμηση, χωρίς export του Trading 212'
@@ -256,7 +244,7 @@
                 [dir]="salesDir()"
                 (sorted)="sortSales($event)"
               >
-                Ποσότητα
+                Μετοχές
               </th>
               <th
                 class="px-4 py-2"
@@ -266,7 +254,7 @@
                 [dir]="salesDir()"
                 (sorted)="sortSales($event)"
               >
-                Έσοδο
+                Έσοδα
               </th>
               <th
                 class="px-4 py-2"
@@ -291,6 +279,7 @@
               <th
                 class="px-4 py-2"
                 sortKey="brokerRealisedPnl"
+                title="Το «Result» του Trading 212 για την πώληση: με μέση τιμή κτήσης, χωρίς να αφαιρεί τις χρεώσεις μετατροπής νομίσματος"
                 align="right"
                 [sort]="salesSort()"
                 [dir]="salesDir()"
@@ -416,7 +405,7 @@
                 [dir]="entriesDir()"
                 (sorted)="sortEntries($event)"
               >
-                Ποσότητα
+                Μετοχές
               </th>
               <th
                 class="px-4 py-2"
@@ -526,7 +515,7 @@
                 [dir]="holdingsDir()"
                 (sorted)="sortHoldings($event)"
               >
-                Ποσότητα
+                Μετοχές
               </th>
               <th
                 class="px-4 py-2"

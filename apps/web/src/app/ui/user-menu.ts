@@ -12,7 +12,7 @@ import { Auth } from '../core/auth';
       <button
         type="button"
         popovertarget="user-menu"
-        class="flex max-w-56 items-center gap-2 rounded-lg px-2 py-1 text-sm transition hover:bg-canvas"
+        class="flex max-w-72 items-center gap-2 rounded-lg px-2 py-1 text-sm transition hover:bg-canvas"
         [attr.aria-label]="'Μενού χρήστη ' + user.email"
       >
         <span

@@ -7,22 +7,7 @@
     <p class="text-sm text-muted">
       Πότε αγόρασες και πούλησες, και πώς άλλαξε η μέση τιμή κτήσης σου.
     </p>
-    <fieldset class="text-xs">
-      <legend class="font-medium text-muted">Μέθοδος κόστους</legend>
-      <div class="mt-1 inline-flex rounded-lg border border-line bg-surface p-0.5">
-        @for (m of ['AVERAGE', 'FIFO']; track m) {
-          <button
-            type="button"
-            (click)="method.set($any(m))"
-            [attr.aria-pressed]="method() === m"
-            class="rounded-md px-3 py-1 text-sm transition"
-            [class]="method() === m ? 'bg-brand text-white' : 'text-muted hover:text-ink'"
-          >
-            {{ m === 'AVERAGE' ? 'Μέση τιμή' : 'FIFO' }}
-          </button>
-        }
-      </div>
-    </fieldset>
+    <app-cost-method-picker [(method)]="method" />
   </div>
 </div>
 
@@ -64,7 +49,7 @@
     <!-- Monthly -->
     <section class="mt-8 rounded-xl border border-line bg-surface p-5">
       <div class="mb-4 flex items-center justify-between gap-4">
-        <h2 class="font-semibold">Ανά μήνα</h2>
+        <h2 class="font-semibold">Αγορές και πωλήσεις ανά μήνα</h2>
         <button
           type="button"
           (click)="showMonthTable.set(!showMonthTable())"

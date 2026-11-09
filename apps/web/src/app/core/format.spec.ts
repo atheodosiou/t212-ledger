@@ -1,7 +1,13 @@
 import { exportUrl } from './api';
-import { apiErrorMessage, isSyncing, money, sumMoney, taxYear, ticker } from './format';
+import { apiErrorMessage, isSyncing, money, price, sumMoney, taxYear, ticker } from './format';
 
 describe('format', () => {
+  it('shows share prices with cents, and more digits only when they exist', () => {
+    expect(price('129.1')).toBe('129,10');
+    expect(price('6.0425')).toBe('6,0425');
+    expect(price(null)).toBe('');
+  });
+
   it('formats money the Greek way', () => {
     // Intl separates the symbol with a non-breaking space.
     expect(money('1234.5').replace(/\s/g, ' ')).toBe('1.234,50 €');

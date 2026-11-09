@@ -36,6 +36,7 @@ import { PagedList } from '../../core/paged-list';
 import { AccountHeader } from '../../ui/account-header';
 import { SyncProgress } from '../../ui/sync-progress';
 import { NgTemplateOutlet } from '@angular/common';
+import { CostMethodPicker } from '../../ui/cost-method-picker';
 import { NearEnd, SkeletonRows, SortHeader, StickyTop } from '../../ui/table';
 
 type Tab = 'sales' | 'entries' | 'holdings';
@@ -58,6 +59,7 @@ type SummaryField = (typeof SUMMARY_FIELDS)[number];
 @Component({
   selector: 'app-accountant-page',
   imports: [
+    CostMethodPicker,
     AccountHeader,
     StickyTop,
     SyncProgress,

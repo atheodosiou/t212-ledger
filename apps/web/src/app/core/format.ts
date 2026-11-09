@@ -5,6 +5,11 @@ export const TIME_ZONE = 'Europe/Athens';
 
 const moneyFormatters = new Map<string, Intl.NumberFormat>();
 const qtyFormat = new Intl.NumberFormat('el-GR', { maximumFractionDigits: 8 });
+/** Share prices: always cents, more digits only when the price has them (penny stocks). */
+const priceFormat = new Intl.NumberFormat('el-GR', {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 4,
+});
 const dateFormat = new Intl.DateTimeFormat('el-GR', {
   timeZone: TIME_ZONE,
   day: '2-digit',
@@ -34,6 +39,10 @@ export function money(value: string | number | null | undefined, currency = 'EUR
 
 export function qty(value: string | null | undefined): string {
   return value === null || value === undefined ? '' : qtyFormat.format(Number(value));
+}
+
+export function price(value: string | null | undefined): string {
+  return value === null || value === undefined ? '' : priceFormat.format(Number(value));
 }
 
 export function date(value: string | Date): string {

@@ -14,11 +14,19 @@ import { AccountHeader } from '../../ui/account-header';
 import { SyncProgress } from '../../ui/sync-progress';
 import { StickyTop } from '../../ui/table';
 import { InstrumentChart } from './instrument-chart';
+import { CostMethodPicker } from '../../ui/cost-method-picker';
 import { MonthlyChart } from './monthly-chart';
 
 @Component({
   selector: 'app-timeline-page',
-  imports: [AccountHeader, StickyTop, SyncProgress, MonthlyChart, InstrumentChart],
+  imports: [
+    AccountHeader,
+    StickyTop,
+    SyncProgress,
+    MonthlyChart,
+    InstrumentChart,
+    CostMethodPicker,
+  ],
   templateUrl: './timeline.page.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
