@@ -517,3 +517,75 @@ export interface InsightsDto {
     currencySeries: string[];
   };
 }
+
+export interface YearTotalsDto {
+  deposits: string;
+  withdrawals: string;
+  purchases: string;
+  buys: number;
+  saleProceeds: string;
+  sells: number;
+  realisedPnl: string;
+  dividends: string;
+  interest: string;
+  costs: string;
+}
+
+export interface YearMoveDto {
+  ticker: string;
+  instrumentName: string | null;
+  realisedPnl: string;
+  returnPct: string | null;
+  days: number | null;
+}
+
+export interface YearOverviewDto {
+  year: number;
+  years: number[];
+  partial: boolean;
+  accounts: { id: string; label: string }[];
+  excluded: { id: string; label: string; reason: string }[];
+  totals: YearTotalsDto;
+  previous: YearTotalsDto | null;
+  portfolio: {
+    investedStart: string;
+    investedEnd: string;
+    positionsStart: number;
+    positionsEnd: number;
+    opened: number;
+    closed: number;
+    top: {
+      ticker: string;
+      instrumentName: string | null;
+      costBasis: string;
+      share: string;
+    }[];
+  };
+  bestPosition: YearMoveDto | null;
+  worstPosition: YearMoveDto | null;
+  bestInstrument: YearMoveDto | null;
+  worstInstrument: YearMoveDto | null;
+  habits: {
+    months: { month: string; buys: number; sells: number }[];
+    busiestMonth: { month: string; trades: number } | null;
+    averageHoldingDays: number | null;
+    quickShare: string | null;
+    winRate: string | null;
+    closedPositions: number;
+  };
+  dividends: {
+    net: string;
+    withheld: string;
+    payers: number;
+    top: { ticker: string; instrumentName: string | null; net: string } | null;
+  };
+  costs: {
+    currencyConversion: string;
+    transactionTaxes: string;
+    depositFees: string;
+    otherFees: string;
+    dividendTaxLost: string;
+    total: string;
+  };
+  taxDue: string | null;
+}

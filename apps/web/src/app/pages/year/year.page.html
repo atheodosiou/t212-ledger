@@ -1,0 +1,370 @@
+<div class="flex flex-wrap items-end justify-between gap-3">
+  <div>
+    <h1 class="text-2xl font-semibold tracking-tight">Η χρονιά σου</h1>
+    <p class="mt-1 text-sm text-muted print:hidden">
+      Μια χρονιά επενδύσεων σε μία σελίδα. Αποθήκευσέ τη ως PDF για να την κρατήσεις.
+    </p>
+  </div>
+  @if (review.hasValue() && review.value().accounts.length) {
+    <button
+      type="button"
+      (click)="print()"
+      class="min-h-10 rounded-lg border border-line bg-surface px-4 text-sm font-medium hover:bg-canvas print:hidden"
+    >
+      Αποθήκευση ως PDF
+    </button>
+  }
+</div>
+
+@if (review.hasValue() && review.value().years.length > 1) {
+  <div
+    role="group"
+    aria-label="Έτος"
+    class="-mx-4 mt-4 flex gap-2 overflow-x-auto px-4 [scrollbar-width:none] print:hidden"
+  >
+    @for (y of review.value().years; track y) {
+      <button
+        type="button"
+        (click)="year.set(y)"
+        [attr.aria-pressed]="review.value().year === y"
+        class="min-h-10 shrink-0 rounded-full border px-4 text-sm font-medium transition"
+        [class]="
+          review.value().year === y
+            ? 'border-brand bg-brand text-white'
+            : 'border-line bg-surface text-muted hover:text-ink'
+        "
+      >
+        {{ y }}
+      </button>
+    }
+  </div>
+}
+
+@if (review.isLoading() && !review.hasValue()) {
+  <div class="mt-6 space-y-4" aria-hidden="true">
+    <div class="h-48 animate-pulse rounded-2xl bg-line/60"></div>
+    <div class="h-64 animate-pulse rounded-xl bg-line/60"></div>
+  </div>
+} @else if (review.error() && !review.hasValue()) {
+  <p class="mt-8 rounded-xl border border-loss/30 bg-loss/5 p-4 text-sm text-loss">
+    Η χρονιά δεν φόρτωσε.
+  </p>
+} @else if (review.hasValue()) {
+  @let r = review.value();
+  @if (r.accounts.length === 0) {
+    <div
+      class="mt-8 rounded-xl border border-dashed border-line bg-surface p-8 text-center text-sm text-muted"
+    >
+      Χρειάζεται ένας πραγματικός (Live) λογαριασμός σε ευρώ.
+      <a routerLink="/" class="font-medium text-brand hover:underline">Σύνδεσε έναν</a>.
+    </div>
+  } @else {
+    <div class="space-y-6" [class.opacity-60]="review.isLoading()">
+      <!-- Hero -->
+      <section
+        class="mt-4 overflow-hidden rounded-2xl bg-brand p-5 text-white sm:p-7 print:border print:border-line print:bg-surface print:text-ink"
+        aria-labelledby="year-title"
+      >
+        <p class="text-sm text-white/80 print:text-muted">
+          {{ r.accounts.length === 1 ? r.accounts[0].label : r.accounts.length + ' λογαριασμοί' }}
+          @if (r.partial) {
+            · μέχρι σήμερα
+          }
+        </p>
+        <h2 id="year-title" class="mt-1 text-4xl font-semibold tracking-tight">
+          Το {{ r.year }} σου
+        </h2>
+        <dl class="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-4">
+          <div>
+            <dt class="text-xs text-white/80 print:text-muted">Συναλλαγές</dt>
+            <dd class="text-2xl font-semibold">{{ r.totals.buys + r.totals.sells }}</dd>
+          </div>
+          <div>
+            <dt class="text-xs text-white/80 print:text-muted">Νέες θέσεις</dt>
+            <dd class="text-2xl font-semibold">{{ r.portfolio.opened }}</dd>
+          </div>
+          <div>
+            <dt class="text-xs text-white/80 print:text-muted">Κλειστές θέσεις</dt>
+            <dd class="text-2xl font-semibold">{{ r.portfolio.closed }}</dd>
+          </div>
+          <div>
+            <dt class="text-xs text-white/80 print:text-muted">Επενδυμένα στο τέλος</dt>
+            <dd class="text-2xl font-semibold">{{ money(r.portfolio.investedEnd) }}</dd>
+          </div>
+        </dl>
+      </section>
+
+      <!-- Numbers -->
+      <section aria-labelledby="numbers-title">
+        <h2 id="numbers-title" class="sr-only">Τα νούμερα της χρονιάς</h2>
+        <dl class="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          @for (t of tiles(); track t.label) {
+            <div
+              class="rounded-xl border border-line bg-surface p-3 sm:p-4 print:break-inside-avoid"
+            >
+              <dt class="text-xs text-muted">{{ t.label }}</dt>
+              <dd
+                class="mt-0.5 text-lg font-semibold"
+                [class.text-gain]="t.tone === 'gain'"
+                [class.text-loss]="t.tone === 'loss'"
+              >
+                {{ t.value }}
+              </dd>
+              @if (t.note) {
+                <dd class="text-xs text-muted">{{ t.note }}</dd>
+              }
+              @if (t.delta) {
+                <dd class="text-xs text-muted">{{ t.delta }}</dd>
+              }
+            </div>
+          }
+        </dl>
+      </section>
+
+      <!-- Best and worst -->
+      @if (r.bestPosition || r.worstPosition) {
+        <section aria-labelledby="moves-title" class="print:break-inside-avoid">
+          <h2 id="moves-title" class="font-semibold">Η καλύτερη και η χειρότερη κίνηση</h2>
+          <div class="mt-3 grid gap-3 sm:grid-cols-2">
+            @for (
+              m of [
+                {
+                  title: 'Καλύτερη θέση',
+                  move: r.bestPosition,
+                  instrument: r.bestInstrument,
+                  gain: true,
+                },
+                {
+                  title: 'Χειρότερη θέση',
+                  move: r.worstPosition,
+                  instrument: r.worstInstrument,
+                  gain: false,
+                },
+              ];
+              track m.title
+            ) {
+              @if (m.move; as mv) {
+                <div
+                  class="rounded-xl border p-4"
+                  [class]="m.gain ? 'border-gain/30 bg-gain/5' : 'border-loss/30 bg-loss/5'"
+                >
+                  <p class="text-xs text-muted">{{ m.title }}</p>
+                  <p class="mt-1 text-lg font-semibold">{{ mv.ticker }}</p>
+                  <p class="truncate text-xs text-muted">{{ mv.instrumentName }}</p>
+                  <p
+                    class="mt-2 text-2xl font-semibold"
+                    [class.text-gain]="m.gain"
+                    [class.text-loss]="!m.gain"
+                  >
+                    {{ money(mv.realisedPnl) }}
+                    @if (mv.returnPct) {
+                      <span class="text-sm font-medium"
+                        >({{ mv.returnPct.replace('.', ',') }}%)</span
+                      >
+                    }
+                  </p>
+                  @if (mv.days !== null) {
+                    <p class="text-xs text-muted">σε {{ holdingLabel(mv.days) }}</p>
+                  }
+                  @if (m.instrument && m.instrument.ticker !== mv.ticker) {
+                    <p class="mt-2 border-t border-line pt-2 text-xs text-muted">
+                      {{
+                        m.gain ? 'Μετοχή με το μεγαλύτερο κέρδος' : 'Μετοχή με τη μεγαλύτερη ζημιά'
+                      }}
+                      στη χρονιά: <strong class="text-ink">{{ m.instrument.ticker }}</strong> ({{
+                        money(m.instrument.realisedPnl)
+                      }})
+                    </p>
+                  }
+                </div>
+              }
+            }
+          </div>
+        </section>
+      }
+
+      <!-- Portfolio -->
+      <section
+        class="rounded-xl border border-line bg-surface p-4 sm:p-5 print:break-inside-avoid"
+        aria-labelledby="portfolio-title"
+      >
+        <h2 id="portfolio-title" class="font-semibold">Το χαρτοφυλάκιό σου</h2>
+        <div class="mt-3 grid grid-cols-[1fr_auto_1fr] items-center gap-3 text-center">
+          <div class="rounded-lg bg-canvas p-3">
+            <p class="text-xs text-muted">1 Ιανουαρίου</p>
+            <p class="font-semibold">{{ money(r.portfolio.investedStart) }}</p>
+            <p class="text-xs text-muted">{{ r.portfolio.positionsStart }} θέσεις</p>
+          </div>
+          <span class="text-muted" aria-hidden="true">→</span>
+          <div class="rounded-lg bg-canvas p-3">
+            <p class="text-xs text-muted">{{ r.partial ? 'Σήμερα' : '31 Δεκεμβρίου' }}</p>
+            <p class="font-semibold">{{ money(r.portfolio.investedEnd) }}</p>
+            <p class="text-xs text-muted">{{ r.portfolio.positionsEnd }} θέσεις</p>
+          </div>
+        </div>
+        <p class="mt-2 text-xs text-muted">
+          Κόστος κτήσης των μετοχών που κρατούσες. Άνοιξες {{ r.portfolio.opened }} και έκλεισες
+          {{ r.portfolio.closed }} θέσεις.
+        </p>
+        @if (r.portfolio.top.length) {
+          <h3 class="mt-4 text-sm font-medium">
+            Οι μεγαλύτερες θέσεις {{ r.partial ? 'σήμερα' : 'στο τέλος της χρονιάς' }}
+          </h3>
+          <ul class="mt-2 space-y-2">
+            @for (h of r.portfolio.top; track h.ticker) {
+              <li class="text-sm">
+                <div class="flex justify-between gap-3">
+                  <span class="min-w-0 truncate">
+                    <span class="font-medium">{{ h.ticker }}</span>
+                    <span class="text-xs text-muted"> {{ h.instrumentName }}</span>
+                  </span>
+                  <span class="shrink-0 tabular-nums"
+                    >{{ h.share.replace('.', ',') }}%
+                    <span class="text-xs text-muted">· {{ money(h.costBasis) }}</span></span
+                  >
+                </div>
+                <div class="mt-1 h-2 overflow-hidden rounded-full bg-canvas">
+                  <div class="h-full rounded-full bg-brand" [style.width.%]="Number(h.share)"></div>
+                </div>
+              </li>
+            }
+          </ul>
+        }
+      </section>
+
+      <!-- Habits -->
+      <section
+        class="rounded-xl border border-line bg-surface p-4 sm:p-5 print:break-inside-avoid"
+        aria-labelledby="habits-title"
+      >
+        <h2 id="habits-title" class="font-semibold">Οι συνήθειές σου</h2>
+        <dl class="mt-3 grid grid-cols-2 gap-2 text-sm sm:grid-cols-4">
+          <div class="rounded-lg bg-canvas p-3">
+            <dt class="text-xs text-muted">Πιο δραστήριος μήνας</dt>
+            <dd class="mt-0.5 font-semibold capitalize">
+              {{ r.habits.busiestMonth ? monthName(r.habits.busiestMonth.month) : '—' }}
+            </dd>
+            @if (r.habits.busiestMonth) {
+              <dd class="text-xs text-muted">{{ r.habits.busiestMonth.trades }} συναλλαγές</dd>
+            }
+          </div>
+          <div class="rounded-lg bg-canvas p-3">
+            <dt class="text-xs text-muted">Μέση διάρκεια κατοχής</dt>
+            <dd class="mt-0.5 font-semibold">
+              {{
+                r.habits.averageHoldingDays !== null
+                  ? holdingLabel(r.habits.averageHoldingDays)
+                  : '—'
+              }}
+            </dd>
+            <dd class="text-xs text-muted">{{ r.habits.closedPositions }} κλειστές θέσεις</dd>
+          </div>
+          <div class="rounded-lg bg-canvas p-3">
+            <dt class="text-xs text-muted">Γρήγορες συναλλαγές</dt>
+            <dd class="mt-0.5 font-semibold">
+              {{ r.habits.quickShare !== null ? r.habits.quickShare + '%' : '—' }}
+            </dd>
+            <dd class="text-xs text-muted">θέσεις που κράτησες έως 1 εβδομάδα</dd>
+          </div>
+          <div class="rounded-lg bg-canvas p-3">
+            <dt class="text-xs text-muted">Κερδοφόρες θέσεις</dt>
+            <dd class="mt-0.5 font-semibold">
+              {{ r.habits.winRate !== null ? r.habits.winRate + '%' : '—' }}
+            </dd>
+            <dd class="text-xs text-muted">των θέσεων που έκλεισες</dd>
+          </div>
+        </dl>
+
+        <h3 class="mt-5 text-sm font-medium">Συναλλαγές ανά μήνα</h3>
+        <div class="mt-2 flex flex-wrap gap-4 text-xs text-muted" aria-hidden="true">
+          <span class="flex items-center gap-1.5"
+            ><span class="size-2.5 rounded-sm bg-[#2a78d6]"></span>Αγορές</span
+          >
+          <span class="flex items-center gap-1.5"
+            ><span class="size-2.5 rounded-sm bg-[#eb6834]"></span>Πωλήσεις</span
+          >
+        </div>
+        <ol class="mt-2 grid h-36 grid-cols-12 items-end gap-1 sm:gap-2">
+          @for (m of monthBars(); track m.label) {
+            <li
+              class="flex h-full flex-col justify-end"
+              [title]="m.title"
+              [attr.aria-label]="m.title"
+            >
+              <span class="flex flex-1 items-end gap-px">
+                <span class="flex-1 rounded-t-sm bg-[#2a78d6]" [style.height.%]="m.buys"></span>
+                <span class="flex-1 rounded-t-sm bg-[#eb6834]" [style.height.%]="m.sells"></span>
+              </span>
+              <span class="mt-1 text-center text-[10px] text-muted sm:text-xs">{{ m.label }}</span>
+            </li>
+          }
+        </ol>
+      </section>
+
+      <div class="grid gap-6 md:grid-cols-2">
+        <!-- Dividends -->
+        <section
+          class="rounded-xl border border-line bg-surface p-4 sm:p-5 print:break-inside-avoid"
+          aria-labelledby="dividends-title"
+        >
+          <h2 id="dividends-title" class="font-semibold">Μερίσματα</h2>
+          @if (r.dividends.payers === 0) {
+            <p class="mt-2 text-sm text-muted">Κανένα μέρισμα τη χρονιά αυτή.</p>
+          } @else {
+            <p class="mt-2 text-3xl font-semibold text-gain">{{ money(r.dividends.net) }}</p>
+            <p class="text-sm text-muted">
+              από {{ r.dividends.payers }}
+              {{ r.dividends.payers === 1 ? 'εταιρεία' : 'εταιρείες' }}, μετά από
+              {{ money(r.dividends.withheld) }} φόρο στο εξωτερικό
+            </p>
+            @if (r.dividends.top; as top) {
+              <p class="mt-3 text-sm">
+                Πλήρωσε τα περισσότερα:
+                <strong>{{ top.ticker }}</strong
+                >&nbsp;<span class="text-muted">({{ money(top.net) }})</span>
+              </p>
+            }
+          }
+        </section>
+
+        <!-- Costs and tax -->
+        <section
+          class="rounded-xl border border-line bg-surface p-4 sm:p-5 print:break-inside-avoid"
+          aria-labelledby="costs-title"
+        >
+          <h2 id="costs-title" class="font-semibold">Κόστος και φόρος</h2>
+          <p class="mt-2 text-3xl font-semibold">{{ money(r.costs.total) }}</p>
+          <p class="text-sm text-muted">σε προμήθειες, χρεώσεις και φόρο που χάθηκε</p>
+          <dl class="mt-3 grid grid-cols-[1fr_auto] gap-x-3 gap-y-1 text-sm">
+            @for (p of costParts; track p.key) {
+              @if (costOf(p.key) > 0) {
+                <dt class="flex items-center gap-2 text-muted">
+                  <span class="size-2.5 shrink-0 rounded-sm" [style.background]="p.color"></span
+                  >{{ p.label }}
+                </dt>
+                <dd class="text-right tabular-nums">{{ money(costOf(p.key)) }}</dd>
+              }
+            }
+          </dl>
+          @if (r.taxDue !== null) {
+            <p class="mt-4 border-t border-line pt-3 text-sm">
+              Φόρος που αναλογεί στην Ελλάδα: <strong>{{ money(r.taxDue) }}</strong>
+              <a
+                routerLink="/taxes"
+                class="ml-1 font-medium text-brand hover:underline print:hidden"
+                >Λεπτομέρειες ›</a
+              >
+            </p>
+          }
+        </section>
+      </div>
+
+      <p class="text-xs text-muted">
+        Από το ιστορικό του Trading 212{{
+          r.accounts.length > 1 ? ' (' + r.accounts.length + ' λογαριασμοί)' : ''
+        }}, με μέση τιμή κτήσης, σε ευρώ. Δημιουργήθηκε {{ generatedAt }}. Ο φόρος είναι εκτίμηση,
+        όχι φορολογική συμβουλή.
+      </p>
+    </div>
+  }
+}

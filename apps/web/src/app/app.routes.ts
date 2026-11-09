@@ -39,6 +39,11 @@ export const routes: Routes = [
         loadComponent: () => import('./pages/taxes/taxes.page').then((m) => m.TaxesPage),
       },
       {
+        path: 'year',
+        title: 'Η χρονιά σου · t212 ledger',
+        loadComponent: () => import('./pages/year/year.page').then((m) => m.YearPage),
+      },
+      {
         path: 'taxes/instruments',
         title: 'Κατηγορίες τίτλων · t212 ledger',
         loadComponent: () =>

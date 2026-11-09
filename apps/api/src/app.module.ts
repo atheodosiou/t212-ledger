@@ -27,6 +27,8 @@ import { InstrumentsService } from './trading212/instruments.service.js';
 import { MeController } from './users/me.controller.js';
 import { TaxController } from './tax/tax.controller.js';
 import { TaxService } from './tax/tax.service.js';
+import { YearController } from './year/year.controller.js';
+import { YearService } from './year/year.service.js';
 import { UserDataService } from './users/user-data.service.js';
 import { UsersService } from './users/users.service.js';
 
@@ -91,6 +93,7 @@ import { UsersService } from './users/users.service.js';
     HealthController,
     MeController,
     TaxController,
+    YearController,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },
@@ -111,6 +114,7 @@ import { UsersService } from './users/users.service.js';
     UsersService,
     UserDataService,
     TaxService,
+    YearService,
   ],
 })
 export class AppModule {}

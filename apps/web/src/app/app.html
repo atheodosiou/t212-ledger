@@ -4,7 +4,7 @@
     class="sr-only rounded-lg bg-brand px-3 py-2 text-sm font-medium text-white focus:not-sr-only focus:fixed focus:left-4 focus:top-3 focus:z-50"
     >Μετάβαση στο περιεχόμενο</a
   >
-  <header class="sticky top-0 z-30 border-b border-line bg-surface">
+  <header class="sticky top-0 z-30 border-b border-line bg-surface print:hidden">
     <div class="mx-auto flex h-14 max-w-6xl items-center justify-between px-4">
       <a
         routerLink="/"
@@ -19,29 +19,43 @@
         <span class="max-sm:sr-only">t212 ledger</span>
       </a>
       @if (auth.user()) {
-        <nav aria-label="Κύριο μενού" class="ml-3 mr-auto flex items-center gap-1 text-sm">
+        <nav
+          aria-label="Κύριο μενού"
+          class="ml-2 mr-auto flex items-center gap-0.5 text-sm sm:ml-3 sm:gap-1"
+        >
           <a
             routerLink="/"
             routerLinkActive="bg-canvas text-ink"
             [routerLinkActiveOptions]="{ exact: true }"
             ariaCurrentWhenActive="page"
-            class="flex min-h-10 items-center rounded-lg px-3 text-muted transition hover:text-ink"
+            class="flex min-h-10 items-center rounded-lg px-2 text-muted transition hover:text-ink sm:px-3"
             >Λογαριασμοί</a
           >
           <a
             routerLink="/taxes"
             routerLinkActive="bg-canvas text-ink"
             ariaCurrentWhenActive="page"
-            class="flex min-h-10 items-center rounded-lg px-3 text-muted transition hover:text-ink"
+            class="flex min-h-10 items-center rounded-lg px-2 text-muted transition hover:text-ink sm:px-3"
             >Φόροι</a
+          >
+          <a
+            routerLink="/year"
+            routerLinkActive="bg-canvas text-ink"
+            ariaCurrentWhenActive="page"
+            class="flex min-h-10 items-center rounded-lg px-2 text-muted transition hover:text-ink sm:px-3"
+            ><span class="sm:hidden">Χρονιά</span><span class="max-sm:hidden">Η χρονιά σου</span></a
           >
         </nav>
       }
       <app-user-menu />
     </div>
   </header>
-  <main id="main" tabindex="-1" class="mx-auto max-w-6xl px-4 py-6 outline-none sm:py-8">
+  <main
+    id="main"
+    tabindex="-1"
+    class="mx-auto max-w-6xl px-4 py-6 outline-none sm:py-8 print:max-w-none print:p-0"
+  >
     <router-outlet />
   </main>
-  <app-toast-host />
+  <app-toast-host class="print:hidden" />
 </div>

@@ -154,3 +154,15 @@
     text-align: center;
   }
 }
+
+/* Saving a page as PDF: white paper, colours kept, no app chrome. */
+@media print {
+  @page {
+    margin: 14mm;
+  }
+  body {
+    background: #ffffff !important;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+}

@@ -380,7 +380,7 @@ export class LedgerService {
   }
 
   /** The fees Trading 212 itemises on each fill (currency conversion, transaction taxes). */
-  private async fillCharges(accountId: string): Promise<FillCharges> {
+  async fillCharges(accountId: string): Promise<FillCharges> {
     const result = await this.db.execute<{
       id: string;
       name: string;

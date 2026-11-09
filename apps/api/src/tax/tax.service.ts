@@ -214,7 +214,8 @@ export class TaxService {
     };
   }
 
-  private async accounts(userId: string) {
+  /** Live accounts in EUR, the ones the estimate covers; and the others, with why. */
+  async accounts(userId: string) {
     const all = await this.db
       .select()
       .from(brokerAccounts)
