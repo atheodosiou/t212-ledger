@@ -187,6 +187,15 @@ export class AccountsController {
     return this.ledger.timeline(id, query.method);
   }
 
+  @Get(':id/insights')
+  async insights(
+    @CurrentUser() user: AppUser,
+    @Param('id', { schema: accountIdSchema }) id: string,
+  ) {
+    const account = await this.accounts.get(user.id, id);
+    return this.ledger.insights(id, account.accountCurrency);
+  }
+
   // PDF and Excel generation is the heaviest work the API does.
   @Throttle({ default: { limit: 20, ttl: 60_000 } })
   @Get(':id/export')

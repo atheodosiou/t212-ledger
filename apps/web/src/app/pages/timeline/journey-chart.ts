@@ -129,6 +129,8 @@ const asDate = (month: string) => new Date(`${month}-01T00:00:00Z`);
 export class JourneyChart {
   readonly journey = input.required<JourneyDto>();
   readonly currency = input('EUR');
+  /** The last series is "everything else" and drawn grey. */
+  readonly lastIsOther = input(true);
 
   protected readonly width = observeWidth();
   protected readonly height = HEIGHT;
@@ -140,7 +142,9 @@ export class JourneyChart {
 
   protected color(i: number): string {
     const last = this.journey().series.length - 1;
-    return i === last ? OTHER_COLOR : JOURNEY_COLORS[i % JOURNEY_COLORS.length];
+    return i === last && this.lastIsOther()
+      ? OTHER_COLOR
+      : JOURNEY_COLORS[i % JOURNEY_COLORS.length];
   }
 
   protected readonly geometry = computed(() => {

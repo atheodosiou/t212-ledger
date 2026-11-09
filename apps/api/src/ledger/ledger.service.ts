@@ -50,6 +50,7 @@ import {
   type PageRequest,
 } from './paging.js';
 import { buildTimeline, type Timeline } from './timeline.js';
+import { buildInsights, type FillCharges, type Insights } from './insights.js';
 
 const INSERT_CHUNK = 500;
 
@@ -355,6 +356,49 @@ export class LedgerService {
         await this.dividendExportRows(accountId),
       ),
     };
+  }
+
+  /** How the user invests: holding periods, results by instrument, costs, exposure. */
+  async insights(
+    accountId: string,
+    accountCurrency = 'EUR',
+  ): Promise<Insights> {
+    const entries = await this.list(accountId);
+    const dividends = dividendDetails(
+      entries,
+      accountCurrency,
+      await this.dividendExportRows(accountId),
+    );
+    return buildInsights(
+      entries,
+      dividends,
+      await this.fillCharges(accountId),
+      {
+        now: new Date(),
+      },
+    );
+  }
+
+  /** The fees Trading 212 itemises on each fill (currency conversion, transaction taxes). */
+  private async fillCharges(accountId: string): Promise<FillCharges> {
+    const result = await this.db.execute<{
+      id: string;
+      name: string;
+      amount: string;
+    }>(sql`
+      select le.id, t->>'name' as name, t->>'quantity' as amount
+        from ${ledgerEntries} le
+        join ${rawEvents} r on r.id = le.raw_event_id,
+             jsonb_array_elements(coalesce(r.payload->'fill'->'walletImpact'->'taxes', '[]'::jsonb)) t
+       where le.account_id = ${accountId}
+         and le.kind in ('BUY', 'SELL')`);
+    const charges: FillCharges = new Map();
+    for (const row of result.rows) {
+      const list = charges.get(row.id) ?? [];
+      list.push({ name: row.name ?? 'OTHER', amount: row.amount ?? '0' });
+      charges.set(row.id, list);
+    }
+    return charges;
   }
 
   /** Dividend rows of Trading 212's CSV export: the exact tax withheld from each. */

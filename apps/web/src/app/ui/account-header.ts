@@ -7,7 +7,7 @@ import { Toasts } from '../core/toasts';
 import { ExportCheckStatus } from './export-check';
 import { ReconciliationStatus } from './reconciliation';
 
-export type AccountSection = 'overview' | 'accountant' | 'timeline';
+export type AccountSection = 'overview' | 'accountant' | 'timeline' | 'insights';
 
 /** Account title, sync status, section navigation and the sync button. Lives in the sticky top of every account page. */
 @Component({
@@ -72,13 +72,13 @@ export type AccountSection = 'overview' | 'accountant' | 'timeline';
         <span class="hidden sm:inline" aria-hidden="true">Συγχρονισμός</span>
       </button>
     </div>
-    <!-- Three equal tabs on a phone; side by side from tablet width. -->
-    <nav class="mt-2 grid grid-cols-3 sm:flex sm:gap-1" aria-label="Ενότητες λογαριασμού">
+    <!-- Four equal tabs on a phone; side by side from tablet width. -->
+    <nav class="mt-2 grid grid-cols-4 sm:flex sm:gap-1" aria-label="Ενότητες λογαριασμού">
       @for (s of sections; track s.id) {
         <a
           [routerLink]="s.path(accountId())"
           [attr.aria-current]="active() === s.id ? 'page' : null"
-          class="-mb-px flex min-h-11 items-center justify-center whitespace-nowrap border-b-2 px-2 text-sm font-medium transition sm:px-3"
+          class="-mb-px flex min-h-11 items-center justify-center whitespace-nowrap border-b-2 px-1 text-sm font-medium transition sm:px-3"
           [class]="
             active() === s.id
               ? 'border-brand text-ink'
@@ -105,11 +105,11 @@ export class AccountHeader {
   protected readonly sections: {
     id: AccountSection;
     label: string;
-    /** For a phone, where three tabs share the width. */
+    /** For a phone, where four tabs share the width. */
     short: string;
     path: (id: string) => string[];
   }[] = [
-    { id: 'overview', label: 'Επισκόπηση', short: 'Επισκόπηση', path: (id) => ['/accounts', id] },
+    { id: 'overview', label: 'Επισκόπηση', short: 'Σύνοψη', path: (id) => ['/accounts', id] },
     {
       id: 'accountant',
       label: 'Για τον λογιστή',
@@ -121,6 +121,12 @@ export class AccountHeader {
       label: 'Χρονολόγιο',
       short: 'Χρονολόγιο',
       path: (id) => ['/accounts', id, 'timeline'],
+    },
+    {
+      id: 'insights',
+      label: 'Ανάλυση',
+      short: 'Ανάλυση',
+      path: (id) => ['/accounts', id, 'insights'],
     },
   ];
 

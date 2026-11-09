@@ -60,6 +60,11 @@ export const routes: Routes = [
         title: 'Χρονολόγιο · t212 ledger',
         loadComponent: () => import('./pages/timeline/timeline.page').then((m) => m.TimelinePage),
       },
+      {
+        path: 'accounts/:id/insights',
+        title: 'Ανάλυση · t212 ledger',
+        loadComponent: () => import('./pages/insights/insights.page').then((m) => m.InsightsPage),
+      },
     ],
   },
   // Anything else: the accounts page, or the sign-in page for someone signed out.

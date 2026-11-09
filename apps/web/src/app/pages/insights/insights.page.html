@@ -1,0 +1,311 @@
+@let cur = currency();
+@let acc = state.value();
+
+<div stickyTop class="-mx-4 border-b border-line bg-canvas/95 px-4 backdrop-blur">
+  <app-account-header [state]="state" [accountId]="id()" active="insights" />
+  <p class="py-3 text-sm text-muted">
+    Τι λέει το ιστορικό σου για το πώς επενδύεις: διάρκεια, αποτελέσματα, κόστος, νομίσματα.
+  </p>
+</div>
+
+@if (acc && state.syncing()) {
+  <app-sync-progress
+    class="mt-6 block"
+    [account]="acc"
+    [now]="state.now()"
+    [variant]="acc.lastSyncedAt ? 'compact' : 'full'"
+  />
+}
+
+@if (state.syncing() || (insights.isLoading() && !insights.hasValue())) {
+  <div class="mt-6 space-y-6" aria-hidden="true">
+    @for (i of [1, 2, 3]; track i) {
+      <div class="h-72 animate-pulse rounded-xl bg-line/60"></div>
+    }
+  </div>
+} @else if (insights.error() && !insights.hasValue()) {
+  <p class="mt-8 rounded-xl border border-loss/30 bg-loss/5 p-4 text-sm text-loss">
+    Η ανάλυση δεν φόρτωσε.
+  </p>
+} @else if (insights.hasValue()) {
+  @let ins = insights.value();
+
+  <!-- Holding periods -->
+  <section
+    class="mt-6 rounded-xl border border-line bg-surface p-4 sm:p-5"
+    aria-labelledby="holding-title"
+  >
+    <h2 id="holding-title" class="font-semibold">Πόσο κράτησες κάθε θέση, και πώς πήγε</h2>
+    <p class="mt-1 text-sm text-muted">
+      Κάθε κύκλος είναι μια θέση που άνοιξες και έκλεισες ολόκληρη: πόσο την κράτησες και τι απόδοση
+      έβγαλε. Όσο μεγαλύτερος ο κύκλος, τόσο περισσότερα χρήματα είχες βάλει.
+    </p>
+    @if (ins.holding.cycles.length === 0) {
+      <p class="mt-4 text-sm text-muted">Δεν έχεις κλείσει ακόμα καμία θέση.</p>
+    } @else {
+      <div class="mt-3 flex flex-wrap gap-4 text-xs text-muted" aria-hidden="true">
+        <span class="flex items-center gap-1.5"
+          ><span class="size-2.5 rounded-full bg-gain/60"></span>Κέρδος</span
+        >
+        <span class="flex items-center gap-1.5"
+          ><span class="size-2.5 rounded-full bg-loss/60"></span>Ζημιά</span
+        >
+      </div>
+      <app-holding-scatter class="mt-2" [cycles]="ins.holding.cycles" [currency]="cur" />
+
+      <ul class="mt-4 grid grid-cols-2 gap-2 text-sm sm:grid-cols-5">
+        @for (b of ins.holding.buckets; track b.key) {
+          <li class="rounded-lg bg-canvas p-3" [class.opacity-50]="b.positions === 0">
+            <p class="text-xs text-muted">{{ bucketLabel[b.key] }}</p>
+            <p
+              class="mt-0.5 font-semibold"
+              [class.text-gain]="Number(b.realisedPnl) > 0"
+              [class.text-loss]="Number(b.realisedPnl) < 0"
+            >
+              {{ money(b.realisedPnl, cur) }}
+            </p>
+            <p class="text-xs text-muted">
+              {{ b.positions }} {{ b.positions === 1 ? 'θέση' : 'θέσεις' }}
+              @if (b.positions) {
+                · {{ Math.round((b.wins / b.positions) * 100) }}% κερδοφόρες
+              }
+            </p>
+          </li>
+        }
+      </ul>
+    }
+  </section>
+
+  <!-- Winners and losers -->
+  <section
+    class="mt-6 rounded-xl border border-line bg-surface p-4 sm:p-5"
+    aria-labelledby="results-title"
+  >
+    <h2 id="results-title" class="font-semibold">Τι κέρδισες και τι έχασες, ανά μετοχή</h2>
+    <p class="mt-1 text-sm text-muted">
+      Το αποτέλεσμα όλων των πωλήσεων κάθε μετοχής, από την αρχή. Και μετοχές που δεν κρατάς πια.
+    </p>
+
+    @let r = ins.results;
+    @if (r.closedPositions) {
+      <dl class="mt-4 grid grid-cols-2 gap-2 text-sm sm:grid-cols-4">
+        <div class="rounded-lg bg-canvas p-3">
+          <dt class="text-xs text-muted">Κερδοφόρες θέσεις</dt>
+          <dd class="mt-0.5 font-semibold">{{ r.winRate }}%</dd>
+          <dd class="text-xs text-muted">{{ r.wins }} από {{ r.closedPositions }} κλειστές</dd>
+        </div>
+        <div class="rounded-lg bg-canvas p-3">
+          <dt class="text-xs text-muted">Μέσο κέρδος</dt>
+          <dd class="mt-0.5 font-semibold text-gain">{{ money(r.averageWin, cur) }}</dd>
+          <dd class="text-xs text-muted">ανά κερδοφόρα θέση</dd>
+        </div>
+        <div class="rounded-lg bg-canvas p-3">
+          <dt class="text-xs text-muted">Μέση ζημιά</dt>
+          <dd class="mt-0.5 font-semibold text-loss">{{ money(r.averageLoss, cur) }}</dd>
+          <dd class="text-xs text-muted">ανά ζημιογόνα θέση</dd>
+        </div>
+        <div class="rounded-lg bg-canvas p-3">
+          <dt class="text-xs text-muted">Κέρδη προς ζημιές</dt>
+          <dd class="mt-0.5 font-semibold">
+            {{ r.profitFactor ? r.profitFactor.replace('.', ',') : '—' }}
+          </dd>
+          <dd class="text-xs text-muted">
+            @if (r.profitFactor) {
+              {{ money(r.profitFactor, cur) }} κέρδος για κάθε 1 € ζημιάς
+            } @else {
+              χρειάζεται και κέρδη και ζημιές
+            }
+          </dd>
+        </div>
+      </dl>
+    }
+
+    @if (results().rows.length === 0) {
+      <p class="mt-4 text-sm text-muted">Δεν έχεις πουλήσει ακόμα τίποτα.</p>
+    } @else {
+      <ul class="mt-5 space-y-1" aria-label="Αποτέλεσμα ανά μετοχή">
+        @for (row of results().rows; track $index) {
+          @if (row) {
+            @let v = Number(row.realisedPnl);
+            @let w = (Math.abs(v) / results().max) * 50;
+            <li
+              class="grid grid-cols-[4.5rem_1fr] items-center gap-2 text-sm sm:grid-cols-[6rem_1fr]"
+            >
+              <span class="truncate font-medium" [title]="row.instrumentName ?? ''">
+                {{ row.ticker }}
+                @if (row.open) {
+                  <span class="sr-only">(την κρατάς ακόμα)</span>
+                }
+              </span>
+              <span class="relative h-6">
+                <span class="absolute inset-y-0 left-1/2 w-px bg-line" aria-hidden="true"></span>
+                <span
+                  class="absolute inset-y-1 rounded-sm"
+                  [class.bg-gain]="v > 0"
+                  [class.bg-loss]="v < 0"
+                  [style.left.%]="v >= 0 ? 50 : 50 - w"
+                  [style.width.%]="w"
+                ></span>
+                <span
+                  class="absolute inset-y-0 flex items-center whitespace-nowrap text-xs tabular-nums"
+                  [class.text-gain]="v > 0"
+                  [class.text-loss]="v < 0"
+                  [style.left.%]="v >= 0 ? 50 + w : null"
+                  [style.right.%]="v < 0 ? 50 + w : null"
+                  [class.pl-1]="v >= 0"
+                  [class.pr-1]="v < 0"
+                  >{{ money(row.realisedPnl, cur) }}</span
+                >
+              </span>
+            </li>
+          } @else {
+            <li class="py-1 text-center text-xs text-muted" aria-hidden="true">⋯</li>
+          }
+        }
+      </ul>
+      @if (results().hidden) {
+        <button
+          type="button"
+          (click)="allResults.set(true)"
+          class="mt-3 min-h-10 rounded-lg border border-line px-4 text-sm font-medium hover:bg-canvas"
+        >
+          Όλες οι μετοχές ({{ results().hidden }} ακόμα)
+        </button>
+      }
+    }
+  </section>
+
+  <!-- Costs -->
+  <section
+    class="mt-6 rounded-xl border border-line bg-surface p-4 sm:p-5"
+    aria-labelledby="costs-title"
+  >
+    @let total = ins.costs.total;
+    <h2 id="costs-title" class="font-semibold">Τι σου κόστισε η επένδυση</h2>
+    <p class="mt-1 text-sm text-muted">
+      Χρήματα που πλήρωσες χωρίς να πάρεις μετοχές: προμήθειες, χρεώσεις, και φόρος μερισμάτων που
+      δεν συμψηφίζεται στην Ελλάδα. Συνολικά
+      <strong class="text-ink">{{ money(total.total, cur) }}</strong
+      >, δηλαδή {{ percentOf(total.total, total.purchases) }} όσων αγόρασες.
+    </p>
+
+    <ul class="mt-3 flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-muted" aria-hidden="true">
+      @for (p of costParts; track p.key) {
+        <li class="flex items-center gap-1.5">
+          <span class="size-2.5 rounded-sm" [style.background]="p.color"></span>{{ p.label }}
+        </li>
+      }
+    </ul>
+
+    <ul class="mt-4 space-y-4">
+      @for (y of ins.costs.years; track y.year) {
+        <li>
+          <div class="flex items-baseline justify-between gap-3 text-sm">
+            <span class="font-medium">{{ y.year }}</span>
+            <span>
+              <strong>{{ money(y.total, cur) }}</strong>
+              <span class="text-xs text-muted">
+                · {{ percentOf(y.total, y.purchases) }} των αγορών</span
+              >
+            </span>
+          </div>
+          <div
+            class="mt-1 flex h-3 overflow-hidden rounded-full bg-canvas"
+            role="img"
+            [attr.aria-label]="'Κόστος ' + y.year + ': ' + money(y.total, cur)"
+          >
+            @for (p of costParts; track p.key) {
+              <span
+                [style.width.%]="(costPart(y, p.key) / costMax()) * 100"
+                [style.background]="p.color"
+              ></span>
+            }
+          </div>
+          <dl
+            class="mt-1.5 grid grid-cols-[1fr_auto] gap-x-3 text-xs sm:grid-cols-[1fr_auto_1fr_auto]"
+          >
+            @for (p of costParts; track p.key) {
+              @if (costPart(y, p.key) > 0) {
+                <dt class="text-muted">{{ p.label }}</dt>
+                <dd class="text-right tabular-nums">{{ money(costPart(y, p.key), cur) }}</dd>
+              }
+            }
+          </dl>
+        </li>
+      }
+    </ul>
+    <p class="mt-4 text-xs text-muted">
+      Η μετατροπή νομίσματος χρεώνεται σε κάθε αγορά και πώληση μετοχής σε άλλο νόμισμα. Ο φόρος
+      μερισμάτων που χάνεται είναι ό,τι κράτησε η χώρα της εταιρείας πάνω από το 5% που συμψηφίζεται
+      στην Ελλάδα (π.χ. 30% στις ΗΠΑ).
+    </p>
+  </section>
+
+  <!-- Currency and country -->
+  <section
+    class="mt-6 rounded-xl border border-line bg-surface p-4 sm:p-5"
+    aria-labelledby="exposure-title"
+  >
+    @let ex = ins.exposure;
+    <h2 id="exposure-title" class="font-semibold">
+      Σε ποιο νόμισμα και ποια χώρα είναι τα χρήματά σου
+    </h2>
+    <p class="mt-1 text-sm text-muted">
+      Τα χρήματα στις ανοιχτές θέσεις σου (κόστος κτήσης), ανά νόμισμα διαπραγμάτευσης και χώρα
+      έδρας.
+    </p>
+    @if (ex.currencies.length === 0) {
+      <p class="mt-4 text-sm text-muted">Δεν έχεις ανοιχτές θέσεις.</p>
+    } @else {
+      <div class="mt-4 grid gap-6 md:grid-cols-2">
+        <div>
+          <h3 class="text-sm font-medium">Νόμισμα, σήμερα</h3>
+          <ul class="mt-2 space-y-2">
+            @for (c of ex.currencies; track c.key) {
+              <li class="text-sm">
+                <div class="flex justify-between gap-3">
+                  <span class="font-medium">{{ c.key }}</span>
+                  <span class="tabular-nums"
+                    >{{ c.share.replace('.', ',') }}%
+                    <span class="text-xs text-muted">· {{ money(c.invested, cur) }}</span></span
+                  >
+                </div>
+                <div class="mt-1 h-2 overflow-hidden rounded-full bg-canvas">
+                  <div class="h-full rounded-full bg-brand" [style.width.%]="Number(c.share)"></div>
+                </div>
+              </li>
+            }
+          </ul>
+        </div>
+        <div>
+          <h3 class="text-sm font-medium">Χώρα έδρας, σήμερα</h3>
+          <ul class="mt-2 space-y-2">
+            @for (c of ex.countries; track c.key) {
+              <li class="text-sm">
+                <div class="flex justify-between gap-3">
+                  <span class="font-medium">{{ country(c.key) }}</span>
+                  <span class="tabular-nums"
+                    >{{ c.share.replace('.', ',') }}%
+                    <span class="text-xs text-muted">· {{ money(c.invested, cur) }}</span></span
+                  >
+                </div>
+                <div class="mt-1 h-2 overflow-hidden rounded-full bg-canvas">
+                  <div class="h-full rounded-full bg-brand" [style.width.%]="Number(c.share)"></div>
+                </div>
+              </li>
+            }
+          </ul>
+          <p class="mt-2 text-xs text-muted">
+            Η χώρα του εκδότη, από το ISIN. Ένα ETF με έδρα την Ιρλανδία μετράει στην Ιρλανδία,
+            ακόμα κι αν κρατά αμερικανικές μετοχές.
+          </p>
+        </div>
+      </div>
+
+      @if (currencyJourney(); as cj) {
+        <h3 class="mt-6 text-sm font-medium">Νόμισμα, στον χρόνο</h3>
+        <app-journey-chart class="mt-2" [journey]="cj" [currency]="cur" [lastIsOther]="false" />
+      }
+    }
+  </section>
+}

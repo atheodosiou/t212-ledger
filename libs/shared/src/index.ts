@@ -450,3 +450,70 @@ export interface TaxOverviewDto {
   e1: { code: string; label: string; amount: string }[];
   totalDue: string;
 }
+
+export interface HoldingCycleDto {
+  ticker: string;
+  isin: string | null;
+  instrumentName: string | null;
+  opened: string;
+  closed: string;
+  days: number;
+  invested: string;
+  realisedPnl: string;
+  returnPct: string;
+}
+
+export type HoldingBucketKey = "DAY" | "WEEK" | "MONTH" | "YEAR" | "LONGER";
+
+export interface CostYearDto {
+  year: number;
+  currencyConversion: string;
+  transactionTaxes: string;
+  depositFees: string;
+  otherFees: string;
+  dividendTaxLost: string;
+  total: string;
+  purchases: string;
+  realisedPnl: string;
+}
+
+export interface ExposureDto {
+  key: string;
+  invested: string;
+  share: string;
+}
+
+export interface InsightsDto {
+  holding: {
+    cycles: HoldingCycleDto[];
+    buckets: {
+      key: HoldingBucketKey;
+      positions: number;
+      wins: number;
+      realisedPnl: string;
+    }[];
+  };
+  results: {
+    instruments: {
+      ticker: string;
+      isin: string | null;
+      instrumentName: string | null;
+      realisedPnl: string;
+      sales: number;
+      open: boolean;
+    }[];
+    closedPositions: number;
+    wins: number;
+    winRate: string | null;
+    averageWin: string | null;
+    averageLoss: string | null;
+    profitFactor: string | null;
+  };
+  costs: { years: CostYearDto[]; total: CostYearDto };
+  exposure: {
+    currencies: ExposureDto[];
+    countries: ExposureDto[];
+    currencyMonths: JourneyMonthDto[];
+    currencySeries: string[];
+  };
+}
