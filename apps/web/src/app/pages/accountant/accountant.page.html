@@ -24,24 +24,24 @@
       <app-cost-method-picker [(method)]="method" />
     </div>
     <div class="flex gap-2">
-      <a
-        [href]="exportHref('xlsx')"
-        download
-        [class.pointer-events-none]="cardsLoading()"
-        [class.opacity-50]="cardsLoading()"
-        class="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white transition hover:bg-brand-strong"
+      <button
+        type="button"
+        (click)="download('xlsx')"
+        [disabled]="cardsLoading() || downloading() !== null"
+        [attr.aria-busy]="downloading() === 'xlsx'"
+        class="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white transition hover:bg-brand-strong disabled:opacity-50"
       >
-        ↓ Excel
-      </a>
-      <a
-        [href]="exportHref('pdf')"
-        download
-        [class.pointer-events-none]="cardsLoading()"
-        [class.opacity-50]="cardsLoading()"
-        class="rounded-lg border border-brand px-4 py-2 text-sm font-medium text-brand transition hover:bg-brand/5"
+        {{ downloading() === 'xlsx' ? 'Ετοιμάζεται…' : '↓ Excel' }}
+      </button>
+      <button
+        type="button"
+        (click)="download('pdf')"
+        [disabled]="cardsLoading() || downloading() !== null"
+        [attr.aria-busy]="downloading() === 'pdf'"
+        class="rounded-lg border border-brand px-4 py-2 text-sm font-medium text-brand transition hover:bg-brand/5 disabled:opacity-50"
       >
-        ↓ PDF
-      </a>
+        {{ downloading() === 'pdf' ? 'Ετοιμάζεται…' : '↓ PDF' }}
+      </button>
     </div>
   </div>
 </div>

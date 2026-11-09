@@ -4,6 +4,7 @@ import {
   Component,
   computed,
   effect,
+  inject,
   input,
   linkedSignal,
   signal,
@@ -37,6 +38,8 @@ import { AccountHeader } from '../../ui/account-header';
 import { SyncProgress } from '../../ui/sync-progress';
 import { NgTemplateOutlet } from '@angular/common';
 import { CostMethodPicker } from '../../ui/cost-method-picker';
+import { downloadFile } from '../../core/download';
+import { Toasts, toastOnError } from '../../core/toasts';
 import { NearEnd, SkeletonRows, SortHeader, StickyTop } from '../../ui/table';
 
 type Tab = 'sales' | 'entries' | 'holdings';
@@ -175,36 +178,42 @@ export class AccountantPage {
   protected readonly holdingsSort = signal<HoldingSort>('costBasis');
   protected readonly holdingsDir = signal<SortDir>('desc');
 
-  protected readonly sales = new PagedList<RealisedSaleDto, SalesPageDto>(() => {
-    if (this.tab() !== 'sales' || this.state.syncing() || !this.report.hasValue()) return null;
-    this.state.syncedAt();
-    return {
-      url: `/api/accounts/${this.id()}/sales`,
-      params: {
-        method: this.method(),
-        year: this.year() ?? undefined,
-        q: this.query(),
-        sort: this.salesSort(),
-        dir: this.salesDir(),
-      },
-    };
-  });
+  protected readonly sales = new PagedList<RealisedSaleDto, SalesPageDto>(
+    () => {
+      if (this.tab() !== 'sales' || this.state.syncing() || !this.report.hasValue()) return null;
+      this.state.syncedAt();
+      return {
+        url: `/api/accounts/${this.id()}/sales`,
+        params: {
+          method: this.method(),
+          year: this.year() ?? undefined,
+          q: this.query(),
+          sort: this.salesSort(),
+          dir: this.salesDir(),
+        },
+      };
+    },
+    { errorTitle: 'Οι πωλήσεις δεν φόρτωσαν' },
+  );
 
-  protected readonly entries = new PagedList<LedgerEntryDto>(() => {
-    if (this.tab() !== 'entries' || this.state.syncing() || !this.report.hasValue()) return null;
-    this.state.syncedAt();
-    this.state.exportedAt();
-    return {
-      url: `/api/accounts/${this.id()}/ledger`,
-      params: {
-        year: this.year() ?? undefined,
-        kind: this.kindFilter(),
-        q: this.query(),
-        sort: this.entriesSort(),
-        dir: this.entriesDir(),
-      },
-    };
-  });
+  protected readonly entries = new PagedList<LedgerEntryDto>(
+    () => {
+      if (this.tab() !== 'entries' || this.state.syncing() || !this.report.hasValue()) return null;
+      this.state.syncedAt();
+      this.state.exportedAt();
+      return {
+        url: `/api/accounts/${this.id()}/ledger`,
+        params: {
+          year: this.year() ?? undefined,
+          kind: this.kindFilter(),
+          q: this.query(),
+          sort: this.entriesSort(),
+          dir: this.entriesDir(),
+        },
+      };
+    },
+    { errorTitle: 'Οι κινήσεις δεν φόρτωσαν' },
+  );
 
   protected readonly holdings = computed(() => {
     if (!this.report.hasValue()) return [];
@@ -234,6 +243,7 @@ export class AccountantPage {
   });
 
   constructor() {
+    toastOnError(this.report, 'Η αναφορά δεν φόρτωσε');
     effect((onCleanup) => {
       const value = this.search();
       const timer = setTimeout(() => this.query.set(value.trim()), 300);
@@ -245,8 +255,28 @@ export class AccountantPage {
     this.year.set(value === 'all' ? null : Number(value));
   }
 
-  protected exportHref(format: 'xlsx' | 'pdf'): string {
-    return exportUrl(this.id(), format, this.method(), this.year());
+  private readonly toasts = inject(Toasts);
+  /** The export being generated, if any. */
+  protected readonly downloading = signal<'xlsx' | 'pdf' | null>(null);
+
+  /** Builds the report on the server and saves it; a failure is reported with a retry. */
+  protected async download(format: 'xlsx' | 'pdf'): Promise<void> {
+    if (this.downloading()) return;
+    this.downloading.set(format);
+    try {
+      await downloadFile(
+        exportUrl(this.id(), format, this.method(), this.year()),
+        `trading212-report.${format}`,
+      );
+    } catch (error) {
+      this.toasts.error(
+        format === 'pdf' ? 'Το PDF δεν δημιουργήθηκε' : 'Το Excel δεν δημιουργήθηκε',
+        error,
+        () => this.download(format),
+      );
+    } finally {
+      this.downloading.set(null);
+    }
   }
 
   protected sortSales(e: { sort: string; dir: SortDir }): void {

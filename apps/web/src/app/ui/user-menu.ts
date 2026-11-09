@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { Auth } from '../core/auth';
+import { Toasts } from '../core/toasts';
 
 /** The signed-in user's address, with their account page and sign-out. */
 @Component({
@@ -67,6 +68,7 @@ import { Auth } from '../core/auth';
 })
 export class UserMenu {
   protected readonly auth = inject(Auth);
+  private readonly toasts = inject(Toasts);
 
   protected close(): void {
     document.getElementById('user-menu')?.hidePopover();
@@ -74,6 +76,10 @@ export class UserMenu {
 
   protected async logout(): Promise<void> {
     this.close();
-    await this.auth.logout();
+    try {
+      await this.auth.logout();
+    } catch (error) {
+      this.toasts.error('Η αποσύνδεση δεν έγινε', error, () => this.logout());
+    }
   }
 }

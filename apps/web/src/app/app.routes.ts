@@ -14,6 +14,12 @@ export const routes: Routes = [
     loadComponent: () => import('./pages/privacy/privacy.page').then((m) => m.PrivacyPage),
   },
   {
+    path: 'unavailable',
+    title: 'Ο server δεν απαντά · t212 ledger',
+    loadComponent: () =>
+      import('./pages/unavailable/unavailable.page').then((m) => m.UnavailablePage),
+  },
+  {
     path: '',
     canMatch: [signedIn],
     children: [

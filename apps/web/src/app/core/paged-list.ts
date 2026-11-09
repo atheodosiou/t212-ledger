@@ -3,9 +3,12 @@ import { computed, DestroyRef, effect, inject, signal, untracked } from '@angula
 import type { PageDto } from '@t212/shared';
 import type { Subscription } from 'rxjs';
 import { apiErrorMessage } from './format';
+import { Toasts } from './toasts';
 
 export interface PagedListOptions {
   pageSize?: number;
+  /** Toast title when a page fails to load, e.g. "Οι πωλήσεις δεν φόρτωσαν". */
+  errorTitle?: string;
 }
 
 /**
@@ -15,6 +18,8 @@ export interface PagedListOptions {
  */
 export class PagedList<T, R extends PageDto<T> = PageDto<T>> {
   private readonly http = inject(HttpClient);
+  private readonly toasts = inject(Toasts);
+  private readonly errorTitle: string;
   private readonly pageSize: number;
   private inFlight: Subscription | null = null;
   private generation = 0;
@@ -39,6 +44,7 @@ export class PagedList<T, R extends PageDto<T> = PageDto<T>> {
     options: PagedListOptions = {},
   ) {
     this.pageSize = options.pageSize ?? 50;
+    this.errorTitle = options.errorTitle ?? 'Τα δεδομένα δεν φόρτωσαν';
     effect(() => {
       const req = this.request();
       untracked(() => this.reset(req));
@@ -91,6 +97,7 @@ export class PagedList<T, R extends PageDto<T> = PageDto<T>> {
         if (generation !== this.generation) return;
         this.error.set(apiErrorMessage(error));
         this.loading.set(false);
+        this.toasts.error(this.errorTitle, error, () => this.retry());
       },
     });
   }

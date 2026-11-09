@@ -3,6 +3,7 @@ import { computed, signal } from '@angular/core';
 import type { AccountDto } from '@t212/shared';
 import { isSyncing } from './format';
 import { whileActive } from './poll';
+import { toastOnError } from './toasts';
 
 /**
  * The account plus its sync state, kept current while a sync runs. Pages use
@@ -32,6 +33,8 @@ export function accountState(id: () => string) {
   });
   /** Changes when a newer export check lands: reports with exact dividend tax can be refetched. */
   const exportedAt = computed(() => value()?.exportCheck?.checkedAt ?? null);
+
+  toastOnError(account, 'Ο λογαριασμός δεν φόρτωσε');
 
   whileActive(syncing, 2000, () => account.reload());
   whileActive(exporting, 10_000, () => account.reload());

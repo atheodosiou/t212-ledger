@@ -10,7 +10,7 @@
         <div class="h-24 animate-pulse rounded-xl bg-line/60"></div>
       } @else if (accounts.error()) {
         <p class="rounded-xl border border-loss/30 bg-loss/5 p-4 text-sm text-loss">
-          Δεν φορτώθηκαν οι λογαριασμοί. Τρέχει το API στο localhost:3000;
+          Οι λογαριασμοί δεν φόρτωσαν.
         </p>
       } @else if (accounts.hasValue()) {
         @for (account of accounts.value(); track account.id) {

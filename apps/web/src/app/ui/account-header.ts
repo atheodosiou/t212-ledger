@@ -2,7 +2,8 @@ import { ChangeDetectionStrategy, Component, inject, input, signal } from '@angu
 import { RouterLink } from '@angular/router';
 import type { AccountState } from '../core/account-state';
 import { Api } from '../core/api';
-import { apiErrorMessage, dateTime, SYNC_LABEL } from '../core/format';
+import { dateTime, SYNC_LABEL } from '../core/format';
+import { Toasts } from '../core/toasts';
 import { ExportCheckStatus } from './export-check';
 import { ReconciliationStatus } from './reconciliation';
 
@@ -60,9 +61,6 @@ export type AccountSection = 'overview' | 'accountant' | 'timeline';
         ↻ Συγχρονισμός
       </button>
     </div>
-    @if (error()) {
-      <p role="alert" class="mt-2 rounded-lg bg-loss/5 p-2 text-sm text-loss">{{ error() }}</p>
-    }
     <nav
       class="mt-2 flex gap-1 overflow-x-auto overflow-y-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       aria-label="Ενότητες λογαριασμού"
@@ -86,13 +84,13 @@ export type AccountSection = 'overview' | 'accountant' | 'timeline';
 })
 export class AccountHeader {
   private readonly api = inject(Api);
+  private readonly toasts = inject(Toasts);
 
   readonly state = input.required<AccountState>();
   readonly accountId = input.required<string>();
   readonly active = input.required<AccountSection>();
 
   protected readonly requested = signal(false);
-  protected readonly error = signal<string | null>(null);
 
   protected readonly sections: {
     id: AccountSection;
@@ -105,13 +103,12 @@ export class AccountHeader {
   ];
 
   protected async syncNow(): Promise<void> {
-    this.error.set(null);
     this.requested.set(true);
     try {
       await this.api.sync(this.accountId());
       this.state().account.reload();
     } catch (error) {
-      this.error.set(apiErrorMessage(error));
+      this.toasts.error('Ο συγχρονισμός δεν ξεκίνησε', error, () => this.syncNow());
     } finally {
       this.requested.set(false);
     }

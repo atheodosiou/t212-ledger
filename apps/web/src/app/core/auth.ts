@@ -56,7 +56,12 @@ export const signedIn: CanMatchFn = async () => {
   const router = inject(Router);
   // The whole address being opened (this guard sits on the empty-path parent route).
   const path = router.currentNavigation()?.extractedUrl.toString() ?? '/';
-  if (await auth.check()) return true;
+  try {
+    if (await auth.check()) return true;
+  } catch {
+    // The server did not answer (it is down, or the connection is): say so, not a blank page.
+    return router.createUrlTree(['/unavailable'], { queryParams: { redirectTo: path } });
+  }
   return router.createUrlTree(['/login'], {
     queryParams: path !== '/' ? { redirectTo: path } : {},
   });
@@ -66,7 +71,12 @@ export const signedIn: CanMatchFn = async () => {
 export const signedOut: CanMatchFn = async () => {
   const auth = inject(Auth);
   const router = inject(Router);
-  return (await auth.check()) ? router.createUrlTree(['/']) : true;
+  try {
+    return (await auth.check()) ? router.createUrlTree(['/']) : true;
+  } catch {
+    // The sign-in page explains on its own that the server does not answer.
+    return true;
+  }
 };
 
 /** A 401 from the API means the session ended (expired, or signed out elsewhere). */

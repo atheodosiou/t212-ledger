@@ -9,7 +9,7 @@
 
 @if (state.account.error()) {
   <p class="mt-6 rounded-xl border border-loss/30 bg-loss/5 p-4 text-sm text-loss">
-    Ο λογαριασμός δεν βρέθηκε.
+    {{ accountError() }}
   </p>
 } @else {
   @if (acc && state.syncing()) {
@@ -33,9 +33,6 @@
   @if (portfolioError(); as message) {
     <div class="mt-6 rounded-xl border border-loss/30 bg-loss/5 p-4 text-sm text-loss">
       {{ message }}
-      <button type="button" (click)="portfolio.reload()" class="ml-2 font-medium underline">
-        Δοκίμασε ξανά
-      </button>
     </div>
   } @else {
     <div #summary class="mt-6">

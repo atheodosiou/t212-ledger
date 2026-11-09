@@ -2,6 +2,7 @@ import { httpResource } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import type { AuthConfigDto } from '@t212/shared';
+import { toastOnError } from '../../core/toasts';
 
 const ERRORS: Record<string, string> = {
   'unverified-email': 'Η Google δεν επιβεβαίωσε τη διεύθυνση email αυτού του λογαριασμού.',
@@ -75,6 +76,10 @@ export class LoginPage {
   readonly redirectTo = input<string>();
 
   protected readonly config = httpResource<AuthConfigDto>(() => '/api/auth/config');
+
+  constructor() {
+    toastOnError(this.config, 'Η σύνδεση δεν είναι διαθέσιμη');
+  }
 
   protected readonly message = computed(() => {
     const code = this.error();

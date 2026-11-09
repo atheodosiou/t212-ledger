@@ -5,6 +5,7 @@ import { Router, RouterLink } from '@angular/router';
 import type { AccountDto, BrokerEnvironment } from '@t212/shared';
 import { Api } from '../../core/api';
 import { whileActive } from '../../core/poll';
+import { toastOnError } from '../../core/toasts';
 import { apiErrorMessage, dateTime, isSyncing, SYNC_LABEL } from '../../core/format';
 
 interface ConnectModel {
@@ -28,6 +29,7 @@ export class AccountsPage {
   protected readonly serverError = signal<string | null>(null);
 
   constructor() {
+    toastOnError(this.accounts, 'Οι λογαριασμοί δεν φόρτωσαν');
     // Keep sync statuses current without a page refresh.
     whileActive(
       () => this.accounts.hasValue() && this.accounts.value().some((a) => isSyncing(a.syncStatus)),

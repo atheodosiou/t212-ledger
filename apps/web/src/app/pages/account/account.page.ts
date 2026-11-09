@@ -14,6 +14,8 @@ import {
 import type { PortfolioDto } from '@t212/shared';
 import { accountState } from '../../core/account-state';
 import { apiErrorMessage } from '../../core/format';
+import { describeError } from '../../core/errors';
+import { toastOnError } from '../../core/toasts';
 import { whileActive } from '../../core/poll';
 import { AccountHeader } from '../../ui/account-header';
 import { ExportCheckPanel } from '../../ui/export-check';
@@ -52,6 +54,9 @@ export class AccountPage {
     this.state.syncedAt(); // refetch once a sync finishes
     return `/api/accounts/${this.id()}/portfolio`;
   });
+  protected readonly accountError = computed(
+    () => describeError(this.state.account.error()).message,
+  );
   protected readonly portfolioValue = computed(() =>
     this.portfolio.hasValue() ? this.portfolio.value() : null,
   );
@@ -74,6 +79,7 @@ export class AccountPage {
   private readonly summary = viewChild<ElementRef<HTMLElement>>('summary');
 
   constructor() {
+    toastOnError(this.portfolio, 'Τα live δεδομένα δεν φόρτωσαν');
     whileActive(
       () => !this.state.syncing(),
       LIVE_REFRESH_MS,

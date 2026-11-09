@@ -15,6 +15,7 @@ import { SyncProgress } from '../../ui/sync-progress';
 import { StickyTop } from '../../ui/table';
 import { InstrumentChart } from './instrument-chart';
 import { CostMethodPicker } from '../../ui/cost-method-picker';
+import { toastOnError } from '../../core/toasts';
 import { MonthlyChart } from './monthly-chart';
 
 @Component({
@@ -41,6 +42,10 @@ export class TimelinePage {
     this.state.syncedAt(); // refetch once a sync finishes
     return { url: `/api/accounts/${this.id()}/timeline`, params: { method: this.method() } };
   });
+
+  constructor() {
+    toastOnError(this.timeline, 'Το χρονολόγιο δεν φόρτωσε');
+  }
 
   protected readonly instruments = computed(() =>
     this.timeline.hasValue() ? this.timeline.value().instruments : [],

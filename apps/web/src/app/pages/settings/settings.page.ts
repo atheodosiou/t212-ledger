@@ -3,7 +3,9 @@ import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@a
 import { RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { Auth } from '../../core/auth';
+import { downloadFile } from '../../core/download';
 import { apiErrorMessage } from '../../core/format';
+import { Toasts } from '../../core/toasts';
 
 /** The user's account: sign-in, their data (download, delete). */
 @Component({
@@ -37,13 +39,14 @@ import { apiErrorMessage } from '../../core/format';
           Trading 212, τις κινήσεις που βγάζουμε από αυτό και τις συνδέσεις σου. Τα API keys δεν
           περιλαμβάνονται.
         </p>
-        <a
-          href="/api/me/export"
-          download
-          class="mt-4 inline-block rounded-lg border border-line px-3 py-2 text-sm font-medium transition hover:border-brand/40"
+        <button
+          type="button"
+          (click)="downloadData()"
+          [disabled]="exporting()"
+          class="mt-4 inline-block rounded-lg border border-line px-3 py-2 text-sm font-medium transition hover:border-brand/40 disabled:opacity-50"
         >
-          ⤓ Λήψη των δεδομένων μου
-        </a>
+          {{ exporting() ? 'Ετοιμάζεται…' : '⤓ Λήψη των δεδομένων μου' }}
+        </button>
       </section>
 
       <section class="rounded-xl border border-loss/30 bg-surface p-5">
@@ -89,12 +92,27 @@ export class SettingsPage {
     () => this.confirm().trim().toLowerCase() === this.auth.user()?.email,
   );
 
+  private readonly toasts = inject(Toasts);
+  protected readonly exporting = signal(false);
+
+  protected async downloadData(): Promise<void> {
+    if (this.exporting()) return;
+    this.exporting.set(true);
+    try {
+      await downloadFile('/api/me/export', 't212-ledger-data.json');
+    } catch (error) {
+      this.toasts.error('Τα δεδομένα σου δεν κατέβηκαν', error, () => this.downloadData());
+    } finally {
+      this.exporting.set(false);
+    }
+  }
+
   protected async logoutEverywhere(): Promise<void> {
     this.busy.set(true);
     try {
       await this.auth.logoutEverywhere();
     } catch (error) {
-      this.error.set(apiErrorMessage(error));
+      this.toasts.error('Η αποσύνδεση δεν έγινε', error, () => this.logoutEverywhere());
     } finally {
       this.busy.set(false);
     }
