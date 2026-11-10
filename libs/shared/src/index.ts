@@ -447,7 +447,7 @@ export interface TaxOverviewDto {
   };
   losses: { pool: LossPoolEntryDto[]; available: string; expiring: string };
   justification: { purchases: string; capitalReturned: string };
-  e1: { code: string; label: string; amount: string }[];
+  e1: { code: string; label: string; amount: string; detail: string | null }[];
   totalDue: string;
 }
 

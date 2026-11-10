@@ -149,7 +149,12 @@
               class="w-12 shrink-0 rounded-md bg-canvas py-1 text-center text-sm font-semibold tabular-nums text-ink"
               >{{ l.code }}</span
             >
-            <span class="min-w-0 flex-1 text-sm">{{ l.label }}</span>
+            <span class="min-w-0 flex-1 text-sm"
+              >{{ l.label }}
+              @if (l.detail) {
+                <span class="mt-0.5 block text-xs text-muted">{{ l.detail }}</span>
+              }
+            </span>
             <span class="shrink-0 text-sm font-medium tabular-nums">{{ money(l.amount) }}</span>
             <button
               type="button"
@@ -186,7 +191,12 @@
                 class="w-12 shrink-0 rounded-md bg-canvas py-1 text-center text-sm font-semibold tabular-nums"
                 >{{ l.code }}</span
               >
-              <span class="min-w-0 flex-1 text-sm">{{ l.label }}</span>
+              <span class="min-w-0 flex-1 text-sm"
+                >{{ l.label }}
+                @if (l.detail) {
+                  <span class="mt-0.5 block text-xs text-muted">{{ l.detail }}</span>
+                }
+              </span>
               <span class="shrink-0 text-sm font-medium tabular-nums">{{ money(l.amount) }}</span>
               <button
                 type="button"
@@ -215,10 +225,41 @@
           }
         </ul>
         <p class="mt-1 text-xs text-muted">
-          Οι αγορές μετοχών είναι δαπάνη που πρέπει να καλύπτεται από εισόδημα (743). Το κόστος όσων
-          πούλησες επιστρέφει ως κεφάλαιο (781). Πώς ακριβώς συμπληρώνονται για συχνές συναλλαγές
-          δεν είναι ξεκάθαρο: ρώτα τον λογιστή.
+          Το 743 είναι δαπάνη: όλες οι αγορές χρεογράφων του έτους, όπως το γράφει το Ε1. Το 781
+          είναι τα χρήματα από τις πωλήσεις που δεν είναι εισόδημα: τα έσοδα των πωλήσεων μείον τα
+          κέρδη που δηλώνονται στο 659 και στο 865. Έτσι, όταν ξαναγοράζεις με τα χρήματα μιας
+          πώλησης, το 781 καλύπτει το 743 και μένει να δικαιολογηθεί μόνο το νέο χρήμα.
         </p>
+      </div>
+      <div class="border-t border-line p-4 sm:p-5">
+        <h3 class="text-sm font-medium">Μην ξεχάσεις</h3>
+        <ul class="mt-1 list-disc space-y-1 pl-5 text-xs text-muted">
+          <li>
+            Πίνακας 2, κωδικός <strong class="text-ink">029</strong>: απάντησε
+            <strong class="text-ink">ΝΑΙ</strong> («Έχετε εισοδήματα ή/και περιουσία στην
+            αλλοδαπή;»). Ο λογαριασμός στο Trading 212 είναι στο εξωτερικό.
+          </li>
+          @if (Number(t.dividends.credit) > 0) {
+            <li>
+              Για τον φόρο του 683 χρειάζεσαι βεβαίωση παρακράτησης, π.χ. την ετήσια κατάσταση
+              μερισμάτων του Trading 212 (ΠΟΛ.1026/2014). Χωρίς αυτήν, ο φόρος εξωτερικού δεν
+              συμψηφίζεται και χρωστάς όλο το 5%: {{ money(t.dividends.greekTax) }}.
+            </li>
+          }
+          <li>
+            Δήλωσε τη ζημιά στο 871 τη χρονιά που προκύπτει: μόνο μια δηλωμένη ζημιά συμψηφίζεται τα
+            επόμενα χρόνια (873).
+          </li>
+          <li>Κράτα τις καταστάσεις του Trading 212 (κινήσεις, μερίσματα, τόκοι) για κάθε έτος.</li>
+        </ul>
+        @if (t.accounts.length) {
+          <a
+            [routerLink]="['/accounts', t.accounts[0].id, 'accountant']"
+            fragment="e1-codes"
+            class="mt-3 inline-block text-sm font-medium text-brand hover:underline"
+            >Όλοι οι κωδικοί και τι σημαίνουν ›</a
+          >
+        }
       </div>
     </section>
 
@@ -547,7 +588,10 @@
           Αρκεί η κατάσταση του Trading 212 ως απόδειξη του φόρου που κρατήθηκε στο εξωτερικό;
         </li>
         <li>Οι τόκοι μετρητών είναι τόκος (15%) ή διανομή αμοιβαίου UCITS (αφορολόγητη);</li>
-        <li>Τι μπαίνει στους κωδικούς 743 και 781 με συχνές αγορές και πωλήσεις;</li>
+        <li>
+          Συμφωνεί με το 743 (όλες οι αγορές) και το 781 (έσοδα πωλήσεων μείον κέρδη) για συχνές
+          συναλλαγές, ή προτιμά μόνο τα χρήματα που μπήκαν και βγήκαν από τον broker;
+        </li>
         <li>Η προμήθεια μετατροπής νομίσματος μετράει στο κόστος κτήσης;</li>
       </ul>
     </section>

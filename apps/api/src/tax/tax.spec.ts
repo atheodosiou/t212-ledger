@@ -274,6 +274,72 @@ describe('computeTaxYear', () => {
     expect(t.e1.find((l) => l.code === '743')?.amount).toBe('1234.56');
     expect(t.e1.find((l) => l.code === '781')?.amount).toBe('90.00');
   });
+
+  it('781: a sale at a loss returns its proceeds, not its cost', () => {
+    const t = computeTaxYear(
+      input({
+        sales: [
+          sale('US_SHARE', '2025-02-01', '10.00', '90.00'), // proceeds 100, 10 to 659
+          sale('US_SHARE', '2025-03-01', '-30.00', '100.00'), // proceeds 70
+        ],
+      }),
+    );
+    const code = (c: string) => t.e1.find((l) => l.code === c)?.amount;
+    expect(code('659')).toBe('10.00');
+    expect(code('781')).toBe('160.00');
+    expect(t.e1.find((l) => l.code === '781')?.detail).toContain('170,00 €');
+  });
+
+  it('781 + gains declared as income add up to what the sales brought in', () => {
+    const sales = [
+      sale('US_SHARE', '2025-02-01', '25.00', '200.00'),
+      sale('US_SHARE', '2025-02-02', '-40.00', '100.00'),
+      sale('IE_GOLD', '2025-03-01', '30.00', '100.00'),
+      sale('IE_GOLD', '2025-03-02', '-10.00', '50.00'),
+      sale('IE_UCITS', '2025-04-01', '5.00', '60.00'),
+    ];
+    const t = computeTaxYear(input({ sales }));
+    const code = (c: string) => Number(t.e1.find((l) => l.code === c)?.amount);
+    const proceeds = sales.reduce((s, x) => s + Number(x.proceeds), 0);
+    expect(code('865')).toBe(20);
+    expect(code('659')).toBe(30);
+    expect(code('781') + code('659') + code('865')).toBeCloseTo(proceeds, 2);
+  });
+
+  it('781 with a net taxable loss: all of those proceeds are capital', () => {
+    const t = computeTaxYear(
+      input({ sales: [sale('IE_GOLD', '2025-03-01', '-20.00', '100.00')] }),
+    );
+    expect(t.e1.find((l) => l.code === '871')?.amount).toBe('20.00');
+    expect(t.e1.find((l) => l.code === '781')?.amount).toBe('80.00');
+  });
+
+  it('dividend tax is 5% of the total, rounded once, as AADE computes it', () => {
+    const t = computeTaxYear(
+      input({
+        dividends: [
+          dividend('NL_SHARE', '2025-03-01', '0.10', '0.00'),
+          dividend('NL_SHARE', '2025-04-01', '0.10', '0.00'),
+          dividend('NL_SHARE', '2025-05-01', '0.10', '0.00'),
+        ],
+      }),
+    );
+    // Per line 0.005 each would round to 0.01 each (0.03); 5% of 0.30 is 0.015 → 0.02.
+    expect(t.dividends.greekTax).toBe('0.02');
+    expect(t.dividends.due).toBe('0.02');
+  });
+
+  it('683 explains what was withheld when only part of it is credited', () => {
+    const t = computeTaxYear(
+      input({
+        dividends: [dividend('US_SHARE', '2025-03-01', '10.00', '3.00')],
+      }),
+    );
+    const line = t.e1.find((l) => l.code === '683');
+    expect(line?.amount).toBe('0.50');
+    expect(line?.detail).toContain('3,00 €');
+    expect(line?.detail).toContain('βεβαίωση');
+  });
 });
 
 describe('lossPool', () => {

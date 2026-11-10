@@ -186,7 +186,7 @@
         </button>
       }
     </div>
-    <div class="flex w-full flex-wrap gap-2 pb-3 sm:w-auto sm:pb-2">
+    <div class="flex w-full flex-wrap gap-2 pb-3 sm:w-auto sm:pb-2" [class.hidden]="tab() === 'e1'">
       @if (tab() === 'entries') {
         <select
           [value]="kindFilter()"
@@ -513,6 +513,10 @@
           }
         </table>
         <ng-container *ngTemplateOutlet="pager; context: { $implicit: list }" />
+      }
+
+      @case ('e1') {
+        <app-e1-codes-reference />
       }
 
       @case ('holdings') {

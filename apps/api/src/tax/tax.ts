@@ -123,6 +123,8 @@ export interface E1Line {
   code: string;
   label: string;
   amount: string;
+  /** How the amount was found, when it is not just a sum. */
+  detail: string | null;
 }
 
 export interface TaxYear {
@@ -172,13 +174,18 @@ const ZERO = new Decimal(0);
 const sum = (values: Decimal[]) => values.reduce((a, b) => a.plus(b), ZERO);
 const cents = (d: Decimal) => d.toFixed(2);
 const round = (d: Decimal) => d.toDecimalPlaces(2);
+/** An amount in a sentence, the Greek way: 1.234,56 €. */
+const euro = (d: Decimal) =>
+  `${new Intl.NumberFormat('el-GR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(d.toDecimalPlaces(2).toNumber())} €`;
 
 export function computeTaxYear(input: TaxInput): TaxYear {
   const { year, profile } = input;
   const rates = RATES[year] ?? RATES[LAST_KNOWN_TAX_YEAR];
 
   // Dividends (art. 40 par. 1, art. 9 par. 2): 5% of the gross, less the tax withheld
-  // abroad, capped per dividend at the Greek tax on it.
+  // abroad, capped per dividend at the Greek tax on it. Totals are rounded once, as AADE
+  // takes 5% of the whole of code 295; each line shows its own share rounded.
+  const raw = new Map<string, { tax: Decimal; credit: Decimal }>();
   const dividendLines: TaxDividendLine[] = input.dividends
     .filter((d) => input.yearOf(d.date) === year)
     .map((d) => {
@@ -188,12 +195,11 @@ export function computeTaxYear(input: TaxInput): TaxYear {
       const gross = d.grossAccount ? new Decimal(d.grossAccount) : null;
       const withheld = d.withheld ? new Decimal(d.withheld) : ZERO;
       const greekTax =
-        exempt || adjustment || !gross
-          ? ZERO
-          : round(gross.times(rates.dividend));
+        exempt || adjustment || !gross ? ZERO : gross.times(rates.dividend);
       const credit = adjustment
         ? ZERO
         : Decimal.min(Decimal.max(withheld, 0), greekTax);
+      raw.set(d.entryId, { tax: greekTax, credit });
       return {
         entryId: d.entryId,
         date: d.date,
@@ -227,13 +233,16 @@ export function computeTaxYear(input: TaxInput): TaxYear {
       .filter((l) => l.adjustment)
       .map((l) => new Decimal(l.withheld ?? 0)),
   );
-  const dividendTax = sum(taxedDividends.map((l) => new Decimal(l.greekTax)));
+  const rawOf = (l: TaxDividendLine) => raw.get(l.entryId)!;
+  const dividendTax = round(sum(taxedDividends.map((l) => rawOf(l).tax)));
   // A refund of withheld tax lowers what can be credited, never below zero.
-  const dividendCredit = Decimal.max(
-    0,
-    Decimal.min(
-      sum(taxedDividends.map((l) => new Decimal(l.credit))),
-      dividendWithheld.plus(adjustments),
+  const dividendCredit = round(
+    Decimal.max(
+      0,
+      Decimal.min(
+        sum(taxedDividends.map((l) => rawOf(l).credit)),
+        dividendWithheld.plus(adjustments),
+      ),
     ),
   );
   const dividendDue = dividendTax.minus(dividendCredit);
@@ -291,8 +300,12 @@ export function computeTaxYear(input: TaxInput): TaxYear {
   const gainsTax = round(taxableAfterLosses.times(rates.gains));
 
   const purchases = new Decimal(input.purchases);
-  const capitalReturned = sum(saleLines.map((l) => new Decimal(l.costBasis)));
   const exemptGains = pnls(false, 1);
+  // 781 is the money from sales that is not income: what the sales brought in, less the
+  // gains declared as income (659, 865). A sale at a loss returns its proceeds, not its cost.
+  const proceeds = sum(saleLines.map((l) => new Decimal(l.proceeds)));
+  const declaredGains = exemptGains.plus(Decimal.max(0, taxableNet));
+  const capitalReturned = Decimal.max(0, proceeds.minus(declaredGains));
 
   const interestCode = profile.interest === 'INTEREST' ? interestGross : ZERO;
   const exempt659 = exemptGains
@@ -306,46 +319,61 @@ export function computeTaxYear(input: TaxInput): TaxYear {
       code: '295',
       label: 'Μερίσματα αλλοδαπής (μικτά)',
       amount: cents(dividendGross),
+      detail: null,
     },
     {
       code: '669',
       label: 'Τόκοι αλλοδαπής (μικτοί)',
       amount: cents(interestCode),
+      detail: null,
     },
     {
       code: '683',
       label: 'Φόρος που παρακρατήθηκε στο εξωτερικό (όσος συμψηφίζεται)',
       amount: cents(dividendCredit),
+      detail: dividendWithheld.plus(adjustments).gt(dividendCredit)
+        ? `Κρατήθηκαν συνολικά ${euro(dividendWithheld.plus(adjustments))}. Δηλώνεται μόνο όσο συμψηφίζεται: έως το 5% κάθε μερίσματος (άρθρο 9 παρ. 2 ΚΦΕ). Χρειάζεται βεβαίωση παρακράτησης.`
+        : dividendCredit.gt(0)
+          ? 'Χρειάζεται βεβαίωση παρακράτησης (ΠΟΛ.1026/2014).'
+          : null,
     },
     {
       code: '659',
       label: 'Απαλλασσόμενα: κέρδη μετοχών <0,5%, UCITS',
       amount: cents(exempt659),
+      detail: null,
     },
     {
       code: '865',
       label: 'Υπεραξία από τίτλους αλλοδαπής (φορολογητέα)',
       amount: cents(Decimal.max(0, taxableNet)),
+      detail: null,
     },
     {
       code: '871',
       label: 'Ζημιά του έτους από φορολογητέους τίτλους',
       amount: cents(Decimal.max(0, taxableNet.neg())),
+      detail: null,
     },
     {
       code: '873',
       label: 'Ζημιές προηγούμενων ετών (έως 5)',
       amount: cents(carried),
+      detail: null,
     },
     {
       code: '743',
       label: 'Αγορές μετοχών και τίτλων',
       amount: cents(purchases),
+      detail: 'Όλες οι αγορές του έτους, με τις χρεώσεις.',
     },
     {
       code: '781',
       label: 'Κεφάλαιο που επέστρεψε από πωλήσεις',
       amount: cents(capitalReturned),
+      detail: proceeds.gt(0)
+        ? `Έσοδα πωλήσεων ${euro(proceeds)} μείον τα κέρδη που δηλώνονται ως εισόδημα (659, 865) ${euro(declaredGains)}.`
+        : null,
     },
   ];
 

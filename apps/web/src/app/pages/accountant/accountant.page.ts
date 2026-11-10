@@ -1,5 +1,6 @@
 import { httpResource } from '@angular/common/http';
 import {
+  afterNextRender,
   ChangeDetectionStrategy,
   Component,
   computed,
@@ -42,8 +43,12 @@ import { CostMethodPicker } from '../../ui/cost-method-picker';
 import { downloadFile } from '../../core/download';
 import { Toasts, toastOnError } from '../../core/toasts';
 import { NearEnd, SkeletonRows, SortHeader, StickyTop } from '../../ui/table';
+import { E1CodesReference } from '../../ui/e1-codes-reference';
+import { ActivatedRoute } from '@angular/router';
 
-type Tab = 'sales' | 'entries' | 'holdings';
+type Tab = 'sales' | 'entries' | 'holdings' | 'e1';
+/** The link to the Ε1 codes, e.g. from the Taxes page. */
+const E1_FRAGMENT = 'e1-codes';
 type HoldingSort = 'ticker' | 'quantity' | 'averageCost' | 'costBasis';
 
 const SUMMARY_FIELDS = [
@@ -71,6 +76,7 @@ type SummaryField = (typeof SUMMARY_FIELDS)[number];
     SkeletonRows,
     NearEnd,
     NgTemplateOutlet,
+    E1CodesReference,
   ],
   templateUrl: './accountant.page.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -166,7 +172,9 @@ export class AccountantPage {
 
   // ── Tables ────────────────────────────────────────────────────────────────
 
-  protected readonly tab = signal<Tab>('sales');
+  protected readonly tab = signal<Tab>(
+    inject(ActivatedRoute).snapshot.fragment === E1_FRAGMENT ? 'e1' : 'sales',
+  );
   protected readonly search = signal('');
   /** `search`, debounced so typing does not fire a request per key. */
   protected readonly query = signal('');
@@ -245,6 +253,21 @@ export class AccountantPage {
 
   constructor() {
     toastOnError(this.report, 'Η αναφορά δεν φόρτωσε');
+    if (this.tab() === 'e1')
+      afterNextRender(() => {
+        // To the tables, with their tabs in view below the sticky header and toolbar.
+        const tables = document.getElementById(E1_FRAGMENT)?.parentElement?.closest('section');
+        if (!tables) return;
+        const header = document.querySelector('header')?.getBoundingClientRect().height ?? 0;
+        const bar = document.querySelector<HTMLElement>('[stickyTop]');
+        const toolbar =
+          bar && getComputedStyle(bar).position === 'sticky'
+            ? bar.getBoundingClientRect().height
+            : 0;
+        window.scrollTo({
+          top: tables.getBoundingClientRect().top + window.scrollY - header - toolbar - 12,
+        });
+      });
     effect((onCleanup) => {
       const value = this.search();
       const timer = setTimeout(() => this.query.set(value.trim()), 300);
@@ -299,6 +322,7 @@ export class AccountantPage {
     { id: 'sales', label: () => 'Πωλήσεις' },
     { id: 'entries', label: () => 'Όλες οι κινήσεις' },
     { id: 'holdings', label: () => this.holdingsTabLabel() },
+    { id: 'e1', label: () => 'Κωδικοί Ε1' },
   ];
 
   protected readonly tiles: { field: SummaryField; label: string; hint?: string }[] = [
