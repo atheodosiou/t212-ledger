@@ -97,7 +97,10 @@ Browser ── https://ledger.theodosiou.me ──▶ Nginx (Contabo VPS)
   - `Dockerfile`, with targets `api` and `web`;
   - `compose.prod.yml`, project `t212-ledger-prod`;
   - `deploy/nginx.conf` and `deploy/env.production.example`.
-- The web app loads nothing from other sites (the fonts are self-hosted), so its CSP allows `'self'` only.
+- The web app loads nothing from other sites (the fonts are self-hosted), so its CSP allows `'self'` only, with
+  one exception: the presentation video on the accounts page plays in a `https://www.youtube-nocookie.com`
+  frame (`frame-src`), created only when the user presses play. Its ID is in
+  `apps/web/src/app/core/intro-video.ts`; the YouTube video must allow embedding.
 - To deploy: Actions → *CI and deployment* → Run workflow → `main`. The checks run, then the VPS runs
   `deploy/t212-deploy.sh` for that commit:
   1. builds both images;
