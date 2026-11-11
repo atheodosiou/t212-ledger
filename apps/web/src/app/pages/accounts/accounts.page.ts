@@ -7,6 +7,8 @@ import { Api } from '../../core/api';
 import { whileActive } from '../../core/poll';
 import { toastOnError } from '../../core/toasts';
 import { apiErrorMessage, dateTime, isSyncing, SYNC_LABEL } from '../../core/format';
+import { INTRO_VIDEO_ID } from '../../core/intro-video';
+import { IntroVideo } from '../../ui/intro-video';
 
 interface ConnectModel {
   label: string;
@@ -17,7 +19,7 @@ interface ConnectModel {
 
 @Component({
   selector: 'app-accounts-page',
-  imports: [RouterLink, FormField, FormRoot],
+  imports: [RouterLink, FormField, FormRoot, IntroVideo],
   templateUrl: './accounts.page.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
@@ -75,4 +77,5 @@ export class AccountsPage {
   protected readonly syncLabel = SYNC_LABEL;
   protected readonly isSyncing = isSyncing;
   protected readonly dateTime = dateTime;
+  protected readonly introVideoId = INTRO_VIDEO_ID;
 }

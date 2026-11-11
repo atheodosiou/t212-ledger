@@ -63,6 +63,10 @@
         }
       }
     </div>
+
+    @if (introVideoId) {
+      <app-intro-video class="mt-6 sm:max-w-md" [videoId]="introVideoId" />
+    }
   </section>
 
   <section class="h-fit rounded-xl border border-line bg-surface p-5">
